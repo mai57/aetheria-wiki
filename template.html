@@ -111,7 +111,26 @@ tr.best td{background:var(--accent-soft)}
 .r-common{} .r-uncommon{color:#3a8d3a} .r-rare{color:#2f6fbf} .r-epic{color:#8a46c9} .r-legendary{color:#c77a12}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .r-uncommon{color:#7fd17f}:root:not([data-theme="light"]) .r-rare{color:#7fb2f2}:root:not([data-theme="light"]) .r-epic{color:#c79bf2}:root:not([data-theme="light"]) .r-legendary{color:#f2b65a}}
 :root[data-theme="dark"] .r-uncommon{color:#7fd17f}:root[data-theme="dark"] .r-rare{color:#7fb2f2}:root[data-theme="dark"] .r-epic{color:#c79bf2}:root[data-theme="dark"] .r-legendary{color:#f2b65a}
+/* peek panel: details of a linked monster/card/item/skill, without leaving the page */
+#peek{position:fixed;top:52px;right:0;bottom:0;width:min(500px,100vw);background:var(--bg);border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.18);z-index:30;display:flex;flex-direction:column;transform:translateX(105%);transition:transform .18s ease;visibility:hidden}
+#peek.open{transform:none;visibility:visible}
+#peek .pk-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+#peek .pk-bar button,#peek .pk-bar a{border:1px solid var(--line);background:var(--panel-2);color:var(--text);border-radius:6px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+#peek .pk-bar a:hover{text-decoration:none;border-color:var(--accent)}
+#peek .pk-bar button:disabled{opacity:.35;cursor:default}
+#peek .pk-bar .pk-t{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pk-body{overflow-y:auto;padding:18px 18px 48px;flex:1}
+#pk-body .dh .big.mon{width:96px;height:96px}
+/* hover tooltip */
+#tip{position:fixed;z-index:40;max-width:320px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);padding:10px 12px;font-size:13px;pointer-events:none;display:none}
+#tip .th{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+#tip .th img{width:44px;height:44px;object-fit:contain}
+#tip .th b{display:block;font-size:14px}
+#tip ul{margin:4px 0 0;padding-left:16px}
+#tip .kvs{display:grid;grid-template-columns:auto auto;gap:0 12px;margin-top:4px}
+#tip .kvs span{color:var(--muted)}
 @media (max-width:820px){
+  #peek{top:0;width:100vw}
   body{overflow:auto;height:auto}
   header{flex-wrap:wrap;padding:0 16px}
   header .meta{display:none}
@@ -138,6 +157,11 @@ tr.best td{background:var(--accent-soft)}
   </aside>
   <article id="detail"></article>
 </main>
+<aside id="peek" aria-label="รายละเอียด">
+  <div class="pk-bar"><button id="pk-back" title="ย้อนกลับ">←</button><span class="pk-t" id="pk-title"></span><a id="pk-open" data-nav href="#">เปิดเต็มหน้า</a><button id="pk-close" title="ปิด (Esc)">✕</button></div>
+  <div id="pk-body"></div>
+</aside>
+<div id="tip"></div>
 <script>
 const DATA = /*__DATA__*/null;
 const BASE = 'https://aetheria-online.in.th';
@@ -771,7 +795,76 @@ function route(){
   showCategory(c);
   showDetail(rawId ? decodeURIComponent(rawId) : state[c].sel);
 }
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => { closePeek(); route(); });
+
+/* ---------- peek panel + tooltip for links inside the detail view ---------- */
+const PEEKABLE = ['monsters', 'cards', 'items', 'skills'];
+const linkTarget = a => {
+  if (!a || a.dataset.nav !== undefined) return null;
+  const m = (a.getAttribute('href') || '').match(/^#(\w+)\/(.+)$/);
+  if (!m || !PEEKABLE.includes(m[1])) return null;
+  const id = decodeURIComponent(m[2]), x = CATS[m[1]].get(id);
+  return x ? {cat:m[1], id, x} : null;
+};
+let peekStack = [];
+function renderPeek(){
+  const t = peekStack[peekStack.length - 1];
+  $('#pk-title').textContent = `${CATS[t.cat].label} · ${t.x.name || t.x.thai || t.id}`;
+  $('#pk-open').setAttribute('href', `#${t.cat}/${encodeURIComponent(t.id)}`);
+  $('#pk-back').disabled = peekStack.length < 2;
+  $('#pk-body').innerHTML = CATS[t.cat].detail(t.x);
+  $('#pk-body').scrollTop = 0;
+  $('#peek').classList.add('open');
+}
+function openPeek(t, fromPeek){
+  if (!fromPeek) peekStack = [];
+  peekStack.push(t); renderPeek(); hideTip();
+}
+function closePeek(){ peekStack = []; $('#peek').classList.remove('open'); }
+$('#pk-close').addEventListener('click', closePeek);
+$('#pk-back').addEventListener('click', () => { if (peekStack.length > 1) { peekStack.pop(); renderPeek(); } });
+$('#pk-open').addEventListener('click', () => { $('#peek').classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && peekStack.length) closePeek(); });
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a || !a.closest('#detail, #peek') || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+  const t = linkTarget(a); if (!t) return;
+  e.preventDefault(); openPeek(t, !!a.closest('#peek'));
+});
+
+const tipEl = $('#tip'); let tipTimer = null;
+const hideTip = () => { clearTimeout(tipTimer); tipEl.style.display = 'none'; };
+function tipHtml({cat, x}){
+  if (cat === 'monsters') {
+    const m = x;
+    return `<div class="th">${img(monArt(m.id))}<div><b>${m.star ? '★ ' : ''}${m.boss ? '👑 ' : ''}${esc(m.name)}</b><span class="note">Lv.${m.level}</span></div></div>
+      <div class="tags" style="margin:0">${elTag(m.element, m.elementLevel)}<span class="tag">${esc(RACE[m.race]||m.race)}</span><span class="tag">${esc(SIZE[m.size]||m.size)}</span></div>
+      <div class="kvs"><span>HP</span><b>${num(m.hp)}</b><span>EXP</span><b>${num(m.exp)}</b><span>ตี</span><b>${m.magicAttack ? 'เวท' : 'กายภาพ'} ${m.attackRangeTiles} ช่อง</b></div>`;
+  }
+  if (cat === 'skills') return `<div class="th">${img(skillIcon(x.id))}<div><b>${esc(x.name)}</b><span class="note">${esc(x.thai || '')}</span></div></div><div>${esc(x.description || '')}</div>`;
+  const i = x, lines = [...(i.attributes || []).map(a => attrShort(a.type, a.value).join(' ')), ...(i.specials || [])];
+  const drop = (i.droppedBy || []).slice().sort((a, b) => b.chance - a.chance)[0], dm = drop && monById.get(String(drop.monsterId));
+  return `<div class="th">${img(itemIcon(i.id))}<div><b class="r-${i.rarity}">${isBossCard(i) ? '👑 ' : ''}${esc(i.name)}</b><span class="note">${esc(i.type === 'Card' ? (i.cardSlotTypes || []).map(s => SLOT[s] || s).join(', ') : (ITEMTYPE[i.type] || i.type))}</span></div></div>
+    ${lines.length ? `<ul>${lines.slice(0, 6).map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
+    ${dm ? `<div class="note" style="margin-top:4px">ดรอปจาก ${esc(dm.name)} (Lv.${dm.level}) ${pct(drop.chance)}</div>` : ''}`;
+}
+if (matchMedia('(hover: hover)').matches) {
+  document.addEventListener('mouseover', e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || !a.closest('#detail, #peek')) return;
+    const t = linkTarget(a); if (!t) return;
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => {
+      tipEl.innerHTML = tipHtml(t); tipEl.style.display = 'block';
+      const r = a.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+      let left = Math.min(r.left, innerWidth - w - 8), top = r.bottom + 6;
+      if (top + h > innerHeight - 8) top = r.top - h - 6;
+      tipEl.style.left = Math.max(8, left) + 'px'; tipEl.style.top = Math.max(8, top) + 'px';
+    }, 250);
+  });
+  document.addEventListener('mouseout', e => { const a = e.target.closest('a[href^="#"]'); if (a && !a.contains(e.relatedTarget)) hideTip(); });
+  document.addEventListener('scroll', hideTip, true);
+}
 
 let t;
 $('#filters').addEventListener('input', e => {
