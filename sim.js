@@ -62,8 +62,8 @@ function stoneNums(st, tier, lv, roll, val){
    post  = extra damage in "skill damage after the whole-skill stone" units, summed over all targets */
 const MODEL = {
   // whole-skill stones (one per skill)
-  // confirmed in game: total = normal cast + 2 repeats at X% each (×4.96 with X≈198)
-  multistrike: (X, T) => ({repeat:2, repeatX:X / 100, cdMul:1 + rng(/คูลดาวน์ \+(\d+)%/, T, 20) / 100, note:'ตีปกติ 1 รอบ + ตีซ้ำอีก 2 รอบ รอบละ X% (ยืนยันกับในเกมแล้ว)'}),
+  // confirmed in game (epic +5, 233.2%): the skill comes out as 2 rounds at X% each, no normal round
+  multistrike: (X, T) => ({repeat:2, repeatX:X / 100, cdMul:1 + rng(/คูลดาวน์ \+(\d+)%/, T, 20) / 100, note:'สกิลออก 2 รอบ รอบละ X% (ยืนยันกับในเกมแล้ว)'}),
   ruthless: X => ({ruthless:X / 100, note:'ทุกครั้งที่ 3 ×X อื่น ๆ −5%'}),
   concentrate: X => ({plus:X / 100, note:'พื้นที่ −1 ช่อง (ไม่ได้คิดว่าโดนมอนน้อยลง)'}),
   aftershock: (X, T, e) => ({post:X / 100 * e.skillT}),
@@ -143,11 +143,14 @@ function simulate(info, lv, picks, env){
     if (eff.neutral) agg.neutral = true;
   }
   const E = agg.neutral ? 1 : env.elMult, c = Math.min(1, Math.max(0, env.crit / 100)), cmul = env.critDmg / 100;
-  const cf = 1 + c * (cmul - 1), base = pct * E * (1 + env.bonus / 100);
+  const sdmg = picks.reduce((a, p) => a + (+p.sdmg || 0), 0);
+  for (const p of picks) if (p.cspd) agg.castMul *= Math.max(0, 1 - p.cspd / 100);
+  // confirmed in game: a stone's "ดาเมจสกิลนี้ +%" line adds to the same pool as other skill-damage bonuses
+  const cf = 1 + c * (cmul - 1), base = pct * E * (1 + (env.bonus + sdmg) / 100), base0 = pct * E * (1 + env.bonus / 100);
   const n = b.n + agg.hitsAdd, N = env.N, skillT = info.area ? N : 1;
   const cdT = b.cd * agg.cdMul, castT = info.cast * agg.castMul + agg.castAdd, minI = env.minI * agg.delayMul;
   const cycle = Math.max(cdT, castT + minI, 0.2);
-  const B0 = base * b.n * cf;                       // one target, before stones
+  const B0 = base0 * b.n * cf;                      // one target, before stones
   const src = new Map(); const add = (k, v) => src.set(k, (src.get(k) || 0) + v);
   let t = 0, casts = 0, stacks = 0, lastHit = -99, dmgCount = 0;
   const hexOn = () => agg.hex && cycle <= 4 && casts > 1 ? 1 + agg.hex : 1;
@@ -157,8 +160,8 @@ function simulate(info, lv, picks, env){
     // every hit of the cast in order: the normal round, then any repeat rounds (Multistrike);
     // each hit can add a Trauma stack, count toward Combo's 5th hit and Ruthless' 3rd hit
     let hs = 0, k = 0;
-    for (let round = 0; round <= agg.repeat; round++) {
-      const w = round === 0 ? 1 : agg.repeatX;
+    const rounds = agg.repeat || 1, w = agg.repeat ? agg.repeatX : 1;
+    for (let round = 0; round < rounds; round++) {
       for (let j = 1; j <= n; j++) {
         k++;
         let m = (agg.combo && k % 5 === 0) ? cmul + agg.combo : cf;
@@ -205,7 +208,7 @@ const simState = id => calc.sim.per[id] ||= {lv:null, stones:[], tags:null, real
 const simTags = info => new Set(simState(info.s.id).tags || [...info.guess]);
 const sockets = lv => UNLOCK.filter(u => lv >= u).length;
 const envOf = () => { const s = calc.sim; return {N:Math.max(1, +s.N || 1), D:Math.max(1, +s.D || 30), crit:+s.crit || 0, critDmg:+s.critDmg || 150, elMult:+s.elMult || 0, myHp:+s.myHp || 100, minI:Math.max(0.1, +s.minI || 0.5), bonus:+s.bonus || 0, party:!!s.party, frozen:!!s.frozen, near:!!s.near, roll:s.roll}; };
-const picksOf = (info, st) => (st.stones || []).slice(0, sockets(st.lv)).filter(x => x && stoneById.has(x.id)).map(x => ({st:stoneById.get(x.id), tier:x.tier || 'legendary', lv:x.lv || 1, val:+x.val || 0}));
+const picksOf = (info, st) => (st.stones || []).slice(0, sockets(st.lv)).filter(x => x && stoneById.has(x.id)).map(x => ({st:stoneById.get(x.id), tier:x.tier || 'legendary', lv:x.lv || 1, val:+x.val || 0, sdmg:+x.sdmg || 0, cspd:+x.cspd || 0}));
 
 function bestCombos(info, lv, tags, env){
   const k = sockets(lv); if (!k) return [];
@@ -253,18 +256,21 @@ function simDetail(info){
   h += `<section><h2>ตั้งค่า</h2>
     <div class="cc-ctl"><label>เลเวลสกิล <select data-sim-lv>${Array.from({length:info.levels}, (_, i) => `<option${i + 1 === st.lv ? ' selected' : ''}>${i + 1}</option>`).join('')}</select></label>
       ${num('N', 'มอนในระยะ', 56, 1, ' ตัว')}${num('D', 'ตีต่อเนื่อง', 60, 1, ' วิ')}${num('minI', 'ดีเลย์ขั้นต่ำต่อการกด', 60, 0.1, ' วิ')}</div>
-    <div class="cc-ctl">${num('crit', 'CRIT', 60, 1, ' %')}${num('critDmg', 'ดาเมจคริ', 64, 1, ' %')}${num('elMult', 'ตัวคูณธาตุ', 56, 0.05)}${num('bonus', 'ดาเมจสกิลนี้เพิ่ม (อาวุธ/พาสซีฟ)', 64, 1, ' %')}</div>
+    <div class="cc-ctl">${num('crit', 'CRIT', 60, 1, ' %')}${num('critDmg', 'ดาเมจคริ', 64, 1, ' %')}${num('elMult', 'ตัวคูณธาตุ', 56, 0.05)}${num('bonus', 'ดาเมจสกิลนี้เพิ่ม (อาวุธ/พาสซีฟ/เจม)', 64, 1, ' %')}</div>
     <div class="cc-ctl">${num('myHp', 'HP ตัวเอง', 56, 1, ' %')}${chk('party', 'ตีพร้อมปาร์ตี้')}${chk('frozen', 'เป้าแข็งอยู่')}${chk('near', 'เป้าอยู่ใกล้ 3 ช่อง')}
       <label>ค่าศิลา <select data-sim="roll">${[['min','ต่ำสุด'],['avg','กลาง'],['max','สูงสุด']].map(([v, l]) => `<option value="${v}"${S.roll === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div>
     <div class="cc-ctl"><label>ดาเมจจริงของสกิลนี้ 1 ครั้ง (ไม่ใส่ศิลา) <input type="number" data-sim-real value="${st.real || ''}" placeholder="ไม่ใส่ก็ได้" style="width:120px"></label>
       <span class="note">ใส่แล้วจะแสดงเป็นตัวเลขดาเมจโดยประมาณ แทน % ของ ${unit}</span></div>
-    <p class="note">CRIT 100% ขึ้นไป = คริทุกครั้ง · "ดาเมจคริ" ตามหน้า status (เช่น 198% = ตอนคริแรง 1.98 เท่า) · ตัวคูณธาตุดูได้จากหน้าแผนที่ (เช่นพิษตีน้ำ = 1.25)</p></section>`;
+    <p class="note">"ดาเมจสกิลนี้เพิ่ม" = รวมโบนัสดาเมจสกิลนี้จากพาสซีฟ อาวุธ และเจม เช่น Shadow Fang: Swift Fang +100% + Voidpiercer +10 +85% + เจม — บรรทัด "ดาเมจสกิลนี้ +%" ของศิลาจะบวกเข้ากองนี้ (ยืนยันกับในเกมแล้ว) · CRIT 100% ขึ้นไป = คริทุกครั้ง · "ดาเมจคริ" ตามหน้า status (เช่น 198% = ตอนคริแรง 1.98 เท่า) · ตัวคูณธาตุดูได้จากหน้าแผนที่ (เช่นพิษตีน้ำ = 1.25)</p></section>`;
   h += `<section><h2>ศิลาที่ใส่ <span class="note">(สกิล Lv.${st.lv} มี ${k} ช่อง — ปลดช่องที่ Lv.${UNLOCK.join(' / ')})</span></h2>
     ${k ? Array.from({length:k}, (_, i) => { const x = (st.stones || [])[i] || {}; return `<div class="cc-ctl"><b>ช่อง ${i + 1}</b>
       <select data-sim-stone="${i}" style="flex:1;min-width:200px">${stoneOpt(x.id)}</select>
       <select data-sim-tier="${i}">${TIERS.map(t => `<option value="${t}"${(x.tier || 'legendary') === t ? ' selected' : ''}>${RARITY[t]}</option>`).join('')}</select>
       <label>เลเวล <select data-sim-slv="${i}">${Array.from({length:STONE_MAXLV}, (_, j) => `<option${(x.lv || 1) === j + 1 ? ' selected' : ''}>${j + 1}</option>`).join('')}</select></label>
-      <label title="ตัวเลขหลักของศิลาก้อนที่มีจริงในเกม (ตัวเลขที่เป็น X ในคำอธิบาย) — ใส่แล้วจะใช้แทนค่าตามระดับ/เลเวล">ค่าจริง <input type="number" step="any" data-sim-sval="${i}" value="${x.val || ''}" placeholder="—" style="width:70px"></label></div>`; }).join('') : '<p class="empty">สกิลเลเวลนี้ยังไม่มีช่องศิลา</p>'}
+      <label title="ดูได้จาก tooltip ศิลาในเกม หัวข้อ 'เลเวลศิลา' → ค่าหลัก — ใส่แล้วใช้แทนค่าตามระดับ/เลเวล (รวมตีบวกแล้ว)">ค่าหลัก <input type="number" step="any" data-sim-sval="${i}" value="${x.val || ''}" placeholder="—" style="width:70px"></label></div>
+      ${x.id ? `<div class="cc-ctl" style="margin-top:-4px;padding-left:52px"><span class="note">บรรทัดเสริมใน tooltip:</span>
+        <label>ดาเมจสกิลนี้ + <input type="number" step="any" data-sim-sdmg="${i}" value="${x.sdmg || ''}" placeholder="0" style="width:56px"> %</label>
+        <label>ร่ายสกิลนี้เร็วขึ้น <input type="number" step="any" data-sim-cspd="${i}" value="${x.cspd || ''}" placeholder="0" style="width:56px"> %</label></div>` : ''}`; }).join('') : '<p class="empty">สกิลเลเวลนี้ยังไม่มีช่องศิลา</p>'}
     <div id="sim-stones"></div></section>
     <section><h2>ผลจำลอง</h2><div id="sim-out"></div></section>
     <section><h2>ชุดศิลาที่ดีที่สุดสำหรับสกิลนี้</h2>
