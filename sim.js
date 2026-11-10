@@ -7,6 +7,7 @@ const stoneById = new Map(STONES.map(s => [s.id, s]));
 const TIERS = ['common', 'rare', 'epic', 'legendary'];
 const UNLOCK = (DATA.stones.unlock || [{skillLevel:5}, {skillLevel:10}, {skillLevel:10}]).map(u => u.skillLevel);
 const PER_LV = DATA.stones.level?.perLevelMainPercent ?? 4, STONE_MAXLV = DATA.stones.level?.maxLevel ?? 5;
+const stoneName = st => st.name || st.thai || st.id;
 const isWhole = st => (st.conditions || []).some(c => c.startsWith('ใส่ได้สกิลละ 1 ก้อน'));
 const rng = (re, t, d) => { const m = (t || '').match(re); return m ? (m[2] ? (+m[1] + +m[2]) / 2 : +m[1]) : d; };
 const SIM_TAGS = ['attack','physical','spell','melee','projectile','area','multihit','casttime','elemental','endow','fire','water','wind','earth','holy','poison','dark','trap','movement','stealth','longcd'];
@@ -174,16 +175,16 @@ function simulate(info, lv, picks, env){
     t += cycle;
   }
   const total = [...src.values()].reduce((a, v) => a + v, 0);
-  for (const {p, eff} of effs) if (!eff) warn.push(`${p.st.thai}: ยังไม่ได้คำนวณผลของศิลานี้`);
+  for (const {p, eff} of effs) if (!eff) warn.push(`${stoneName(p.st)}: ยังไม่ได้คำนวณผลของศิลานี้`);
   return {total, dps:total / env.D, casts, cycle, src, effs, B0, base, cf, n, warn};
 }
 function checkPicks(info, tags, picks){
   const issues = [];
   const whole = picks.filter(p => isWhole(p.st));
-  if (whole.length > 1) issues.push(`ศิลาป้าย "ดาเมจทั้งสกิล" ใส่ได้สกิลละ 1 ก้อน: ${whole.map(p => p.st.thai).join(', ')}`);
+  if (whole.length > 1) issues.push(`ศิลาป้าย "ดาเมจทั้งสกิล" ใส่ได้สกิลละ 1 ก้อน: ${whole.map(p => stoneName(p.st)).join(', ')}`);
   if (picks.some(p => p.st.id === 'pinpoint') && picks.some(p => ['fork','volley','chain','returning'].includes(p.st.id))) issues.push('ศิลาลูกเดียวแรงใส่คู่กับศิลาที่ให้ลูกเพิ่มไม่ได้');
   const ids = picks.map(p => p.st.id); if (new Set(ids).size < ids.length) issues.push('ใส่ศิลาชนิดเดียวกันซ้ำ');
-  for (const p of picks) if (!fitsStone(p.st, tags)) issues.push(`${p.st.thai} อาจใส่กับสกิลนี้ไม่ได้ (ต้องการ: ${reqText(p.st)})`);
+  for (const p of picks) if (!fitsStone(p.st, tags)) issues.push(`${stoneName(p.st)} อาจใส่กับสกิลนี้ไม่ได้ (ต้องการ: ${reqText(p.st)})`);
   return issues;
 }
 const reqText = st => { const r = st.requires || {}, f = a => a.map(t => TAG_TH[t] || t).join(' + ');
@@ -230,7 +231,7 @@ function simDetail(info){
   const unit = info.mag ? 'MATK' : 'ATK';
   const stoneOpt = (cur) => {
     const groups = [['ใส่ได้ · คำนวณได้', x => fitsStone(x, tags) && modelled(x)], ['ใส่ได้ · ยังไม่คำนวณ', x => fitsStone(x, tags) && !modelled(x)], ['ประเภทไม่ตรง (เผื่อระบบเดาประเภทสกิลผิด)', x => !fitsStone(x, tags)]];
-    return `<option value="">— ไม่ใส่ —</option>` + groups.map(([g, f]) => `<optgroup label="${g}">${STONES.filter(f).map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${isWhole(x) ? '◆ ' : ''}${esc(x.thai)} · ${esc(x.name || x.id)}</option>`).join('')}</optgroup>`).join('');
+    return `<option value="">— ไม่ใส่ —</option>` + groups.map(([g, f]) => `<optgroup label="${g}">${STONES.filter(f).map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${isWhole(x) ? '◆ ' : ''}${esc(stoneName(x))} (${esc(x.thai)})</option>`).join('')}</optgroup>`).join('');
   };
   const num = (k2, label, w = 70, step = 'any', unitTxt = '') => `<label>${label} <input type="number" data-sim="${k2}" step="${step}" value="${esc(S[k2])}" style="width:${w}px">${unitTxt}</label>`;
   const chk = (k2, label) => `<label><input type="checkbox" data-sim="${k2}"${S[k2] ? ' checked' : ''}> ${label}</label>`;
@@ -270,9 +271,9 @@ function runSim(info){
   const picks = picksOf(info, st), r = simulate(info, st.lv, picks, env), r0 = simulate(info, st.lv, [], env);
   const scale = st.real > 0 ? st.real / r0.B0 : 0, unit = info.mag ? 'MATK' : 'ATK';
   const issues = checkPicks(info, tags, picks);
-  const name = k => k === 'skill' ? 'ดาเมจสกิล' : (stoneById.get(k)?.thai || k);
+  const name = k => k === 'skill' ? 'ดาเมจสกิล' : (stoneById.has(k) ? stoneName(stoneById.get(k)) : k);
   $('#sim-stones').innerHTML = picks.map(p => { const {X, text} = stoneNums(p.st, p.tier, p.lv, env.roll); const e = r.effs.find(x => x.p === p)?.eff;
-    return `<div class="note" style="margin-top:4px">${isWhole(p.st) ? '◆ ' : ''}<b>${esc(p.st.thai)}</b> ${esc(RARITY[p.tier])} Lv.${p.lv}: ${esc(text)} → ใช้ค่า <b>${+X.toFixed(1)}</b>${e?.note ? ` · ${esc(e.note)}` : ''}${!e ? ' · <span style="color:var(--warn)">ยังไม่คำนวณ</span>' : ''}</div>`; }).join('');
+    return `<div class="note" style="margin-top:4px">${isWhole(p.st) ? '◆ ' : ''}<b>${esc(stoneName(p.st))}</b> ${esc(RARITY[p.tier])} Lv.${p.lv}: ${esc(text)} → ใช้ค่า <b>${+X.toFixed(1)}</b>${e?.note ? ` · ${esc(e.note)}` : ''}${!e ? ' · <span style="color:var(--warn)">ยังไม่คำนวณ</span>' : ''}</div>`; }).join('');
   out.innerHTML = `${issues.length ? `<div class="mul w" style="display:block;text-align:left;padding:6px 10px;margin-bottom:8px">${issues.map(esc).join('<br>')}</div>` : ''}
     <div class="kv">
       <div><span>ดาเมจรวม ${env.D} วิ</span><b>${fmtD(r.total, scale)}</b></div>
@@ -288,7 +289,7 @@ function runSim(info){
   const best = bestCombos(info, st.lv, tags, env);
   $('#sim-best').innerHTML = !best.list?.length ? `<p class="empty">${sockets(st.lv) ? 'ไม่มีศิลาที่คำนวณได้สำหรับสกิลประเภทนี้' : 'สกิลเลเวลนี้ยังไม่มีช่องศิลา'}</p>`
     : `<div class="tw"><table><tr><th>#</th><th>ศิลา</th><th class="num">รวม ${env.D} วิ</th><th class="num">เทียบไม่ใส่</th><th></th></tr>
-      ${best.list.map((x, i) => `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td>${x.picks.map(p => `${isWhole(p.st) ? '◆ ' : ''}${esc(p.st.thai)}`).join(' + ')}</td><td class="num">${fmtD(x.total, scale)}</td><td class="num"><b>+${Math.round((x.total / best.base - 1) * 100)}%</b></td>
+      ${best.list.map((x, i) => `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td>${x.picks.map(p => `${isWhole(p.st) ? '◆ ' : ''}${esc(stoneName(p.st))}`).join(' + ')}</td><td class="num">${fmtD(x.total, scale)}</td><td class="num"><b>+${Math.round((x.total / best.base - 1) * 100)}%</b></td>
       <td><button class="chipbtn" data-sim-use="${i}">ใส่ชุดนี้</button></td></tr>`).join('')}</table></div>
       <p class="note">ลองทุกชุดจากศิลาที่ใส่ได้และคำนวณได้ ${best.cand} แบบ ตามประเภทสกิลด้านบนและสถานการณ์ที่ตั้งไว้</p>`;
   window.__simBest = best.list;

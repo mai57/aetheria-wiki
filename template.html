@@ -716,10 +716,10 @@ const CATS = {
     filters: st => `<input type="search" data-k="q" placeholder="ค้นหาศิลา หรือผล" value="${esc(st.q)}">`,
     match: () => true,
     text: s => `${s.thai} ${s.name||''} ${s.id} ${s.effect||''}`,
-    row: s => ({ic:'', name: esc(s.thai), sub: esc(s.name || s.id), right: esc(s.role || '')}),
+    row: s => ({ic:'', name: esc(s.name || s.thai), sub: esc(s.thai || s.id), right: esc(s.role || '')}),
     get: id => DATA.stones.list.find(s => s.id === id),
     detail: s => {
-      let h = `<div class="dh"><div><h1>${esc(s.thai)}</h1><div class="sub">${esc(s.name||'')} · ${esc(s.id)}${s.role ? ' · ' + esc(s.role) : ''}</div></div></div>`;
+      let h = `<div class="dh"><div><h1>${esc(s.name || s.thai)}</h1><div class="sub">${esc(s.thai||'')} · ${esc(s.id)}${s.role ? ' · ' + esc(s.role) : ''}</div></div></div>`;
       if (s.effect) h += `<section><p>${esc(s.effect)}</p></section>`;
       if (s.tiers?.length) h += `<section><h2>ระดับ</h2><div class="tw"><table><tr><th>ระดับ</th><th>ผล</th></tr>${s.tiers.map(t => `<tr><td class="r-${t.tier}">${esc(RARITY[t.tier]||t.tier)}</td><td>${esc(t.text)}</td></tr>`).join('')}</table></div></section>`;
       if (s.requires) h += `<section><h2>ใช้กับ</h2>${generic(s.requires)}</section>`;
