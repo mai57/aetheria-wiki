@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aetheria Wiki</title>
+<style>
+:root{
+  --bg:#f6f3ec; --panel:#fffdf8; --panel-2:#f1ece1; --line:#e2dacb; --text:#2b261e; --muted:#7a7062;
+  --accent:#9a6b14; --accent-soft:#f4e6c6; --sel:#efe0bd; --link:#8a5a00;
+  --good:#1f7a4d; --good-bg:#dcf2e5; --bad:#b3261e; --bad-bg:#fbe1de; --warn:#9a5b00; --warn-bg:#fcecd2;
+  --shadow:0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16140f; --panel:#1f1c16; --panel-2:#29251d; --line:#3a3428; --text:#ece6da; --muted:#a59c8c;
+    --accent:#e0b154; --accent-soft:#3b3020; --sel:#3d3322; --link:#f0c46a;
+    --good:#6fd3a0; --good-bg:#18382a; --bad:#ff8f86; --bad-bg:#43201d; --warn:#f3b65a; --warn-bg:#3e2c14;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16140f; --panel:#1f1c16; --panel-2:#29251d; --line:#3a3428; --text:#ece6da; --muted:#a59c8c;
+  --accent:#e0b154; --accent-soft:#3b3020; --sel:#3d3322; --link:#f0c46a;
+  --good:#6fd3a0; --good-bg:#18382a; --bad:#ff8f86; --bad-bg:#43201d; --warn:#f3b65a; --warn-bg:#3e2c14;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 "Sarabun","Noto Sans Thai","Leelawadee UI",system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
+header{display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line);flex:none;min-height:52px}
+header .brand{font-weight:700;color:var(--accent);white-space:nowrap}
+nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1}
+nav a{padding:14px 12px;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;font-weight:500}
+nav a:hover{color:var(--text);text-decoration:none}
+nav a.on{color:var(--text);border-bottom-color:var(--accent)}
+nav a .n{font-size:12px;color:var(--muted);margin-left:4px}
+header .meta{font-size:12px;color:var(--muted);white-space:nowrap}
+header button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:4px 8px;cursor:pointer;font:inherit;font-size:12px}
+main{flex:1;display:grid;grid-template-columns:minmax(300px,380px) 1fr;min-height:0}
+#side{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel);min-height:0}
+#filters{padding:10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px}
+#filters input[type=search]{flex:1 1 100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+#filters select{flex:1 1 30%;min-width:0;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit;font-size:13px}
+#filters label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer}
+#count{font-size:12px;color:var(--muted);padding:4px 12px;border-bottom:1px solid var(--line)}
+#list{flex:1;overflow-y:auto;outline:none}
+.row{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid var(--line);cursor:pointer;color:var(--text)}
+.row:hover{background:var(--panel-2);text-decoration:none}
+.row.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--accent)}
+.row .ic{width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center}
+.row .ic img{max-width:32px;max-height:32px;object-fit:contain}
+.row .t{flex:1;min-width:0}
+.row .t b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .t small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .r{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+#detail{overflow-y:auto;padding:24px 28px 60px;min-width:0}
+.empty{color:var(--muted);padding:40px 0;text-align:center}
+.dh{display:flex;gap:16px;align-items:flex-start;margin-bottom:16px}
+.dh .big{width:72px;height:72px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.dh .big img{max-width:64px;max-height:64px;object-fit:contain}
+.dh .big.mon{width:120px;height:120px}
+.dh .big.mon img{max-width:112px;max-height:112px}
+.dh h1{margin:0 0 4px;font-size:22px;line-height:1.25}
+.dh .sub{color:var(--muted)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);font-size:12px;white-space:nowrap}
+.tag.star{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.el{display:inline-block;padding:0 7px;border-radius:999px;font-size:12px;color:#fff;white-space:nowrap}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+section h2{margin:0 0 10px;font-size:15px;color:var(--accent)}
+section p{margin:4px 0}
+.note{color:var(--muted);font-size:13px}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 16px}
+.kv div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding:2px 0}
+.kv span{color:var(--muted)}
+ul.plain{margin:0;padding-left:18px}
+ul.plain li{margin:2px 0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tw{overflow-x:auto}
+.mini{display:inline-flex;align-items:center;gap:6px}
+.mini img{width:24px;height:24px;object-fit:contain}
+td .mini{white-space:nowrap}
+.cc-ctl{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:10px 0}
+.cc-ctl label{display:inline-flex;align-items:center;gap:6px}
+.cc-ctl select,.cc-ctl input[type=number]{padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
+#pk .cc-ctl label{cursor:pointer}
+.pk-img{width:24px;height:24px;object-fit:contain}
+.cc-els{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.cc-els label{display:inline-flex;align-items:center;gap:3px;cursor:pointer;opacity:.45}
+.cc-els label.on{opacity:1}
+.cc-els input{display:none}
+.chipbtn{border:1px solid var(--line);background:var(--panel-2);color:var(--muted);border-radius:999px;padding:0 8px;font:inherit;font-size:12px;cursor:pointer;margin:2px 4px 2px 0}
+.chipbtn:hover{border-color:var(--bad);color:var(--bad)}
+.cc-cards{display:flex;flex-direction:column;gap:2px}
+.cc-cards span{white-space:nowrap}
+.cc-cards .mini img{width:20px;height:20px}
+.cc-cards .x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 4px}
+.cc-cards .x:hover{color:var(--bad)}
+.mul{display:inline-block;min-width:44px;text-align:center;border-radius:6px;padding:0 6px;font-variant-numeric:tabular-nums;font-weight:600}
+.mul.g{background:var(--good-bg);color:var(--good)}
+.mul.b{background:var(--bad-bg);color:var(--bad)}
+.mul.w{background:var(--warn-bg);color:var(--warn)}
+.mul.n{background:var(--panel-2);color:var(--muted);font-weight:500}
+tr.best td{background:var(--accent-soft)}
+.r-common{} .r-uncommon{color:#3a8d3a} .r-rare{color:#2f6fbf} .r-epic{color:#8a46c9} .r-legendary{color:#c77a12}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .r-uncommon{color:#7fd17f}:root:not([data-theme="light"]) .r-rare{color:#7fb2f2}:root:not([data-theme="light"]) .r-epic{color:#c79bf2}:root:not([data-theme="light"]) .r-legendary{color:#f2b65a}}
+:root[data-theme="dark"] .r-uncommon{color:#7fd17f}:root[data-theme="dark"] .r-rare{color:#7fb2f2}:root[data-theme="dark"] .r-epic{color:#c79bf2}:root[data-theme="dark"] .r-legendary{color:#f2b65a}
+@media (max-width:820px){
+  body{overflow:auto;height:auto}
+  header{flex-wrap:wrap;padding:0 16px}
+  header .meta{display:none}
+  nav{flex-basis:100%;order:3}
+  main{display:block}
+  #side{border-right:0;border-bottom:1px solid var(--line)}
+  #list{max-height:42vh}
+  #detail{padding:16px 16px 48px;overflow:visible}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Aetheria Wiki</div>
+  <nav id="nav"></nav>
+  <div class="meta" id="meta"></div>
+  <button id="theme" title="สลับธีม">ธีม</button>
+</header>
+<main>
+  <aside id="side">
+    <div id="filters"></div>
+    <div id="count"></div>
+    <div id="list" tabindex="0"></div>
+  </aside>
+  <article id="detail"></article>
+</main>
+<script>
+const DATA = /*__DATA__*/null;
+const BASE = 'https://aetheria-online.in.th';
+
+/* ---------- labels (taken from the official wiki) ---------- */
+const EL = {neutral:'ไร้ธาตุ',water:'น้ำ',earth:'ดิน',fire:'ไฟ',wind:'ลม',poison:'พิษ',holy:'ศักดิ์สิทธิ์',shadow:'ความมืด',ghost:'วิญญาณ',undead:'ผีดิบ'};
+const RACE = {formless:'ไร้รูปร่าง',undead:'อันเดด',brute:'สัตว์',plant:'พืช',insect:'แมลง',fish:'สัตว์น้ำ',demon:'ปีศาจ','demi-human':'มนุษย์',angel:'เทวดา',dragon:'มังกร'};
+const SIZE = {small:'เล็ก',medium:'กลาง',large:'ใหญ่'};
+const RARITY = {common:'ธรรมดา',uncommon:'ดี',rare:'หายาก',epic:'มหากาพย์',legendary:'ตำนาน'};
+const ITEMTYPE = {Equipment:'อุปกรณ์',Consumable:'ของใช้',Miscellaneous:'ของสะสม/วัตถุดิบ',AwakeningStone:'ศิลาปลุกพลัง',WeaponStone:'ศิลาอาวุธ',Enchantment:'วัสดุตีบวก',Craft:'วัสดุคราฟต์',Card:'การ์ด'};
+const SLOT = {Weapon:'อาวุธ',Helmet:'หมวก',HeadMid:'หัวกลาง',HeadLow:'หัวล่าง',Armor:'เสื้อเกราะ',Cape:'ผ้าคลุม',Glove:'ถุงมือ',Pants:'กางเกง',Boot:'รองเท้า',Acc:'เครื่องประดับ',Shield:'โล่',Ammo:'ลูกธนู',Gem:'เจม',LevelGem:'เจมเลเวล',CostumeHeadTop:'คอสตูมหมวก',CostumeHeadMid:'คอสตูมหน้า',CostumeHeadLow:'คอสตูมปาก',CostumeGarment:'คอสตูมผ้าคลุม',CostumeSpirit:'คอสตูมภูต',CostumeOutfit:'คอสตูมชุด',CostumeCompanion:'คอสตูมคู่หู'};
+const WEAPON = {Sword:'ดาบ',TwoHandSword:'ดาบสองมือ',Dagger:'มีดสั้น',Axe:'ขวาน',TwoHandAxe:'ขวานสองมือ',Spear:'หอก',TwoHandSpear:'หอกสองมือ',Mace:'กระบอง',Staff:'คทา',Bow:'ธนู',Knuckle:'สนับมือ',Katar:'คาตาร์',Instrument:'เครื่องดนตรี',Whip:'แส้',Book:'หนังสือ',Gun:'ปืน',Huuma:'ฮูม่า'};
+const ATTR = {STR:'STR',AGI:'AGI',VIT:'VIT',INT:'INT',DEX:'DEX',LUK:'LUK',MELEE_ATTACK:'ATK',RANGE_ATTACK:'ATK (ระยะไกล)',MAGIC_ATTACK:'MATK',HIT:'HIT',FLEE:'FLEE',CRI:'CRIT',CRI_DAMAGE:'ดาเมจคริ %',MELEE_DEFENSE:'DEF',MAGIC_DEFENSE:'MDEF',MAXHP:'Max HP',MAXSP:'Max SP',MAXHP_PERCENT:'Max HP %',MAXSP_PERCENT:'Max SP %',ATK_PERCENT:'ATK %',MATK_PERCENT:'MATK %',ATK_SPEED:'ASPD',ATK_SPEED_PERCENT:'ASPD %',MOVE_SPEED:'ความเร็วเดิน %',CASTING_SPEED:'ความเร็วร่าย',MELEE_DAMAGE_PERCENT:'ดาเมจประชิด %',RANGE_DAMAGE_PERCENT:'ดาเมจระยะไกล %',MAGIC_DAMAGE_PERCENT:'ดาเมจเวท %',DAMAGE_REDUCTION:'ลดดาเมจที่ได้รับ %',BLOCK_CHANCE:'โอกาสบล็อก %',HEAL_POWER:'พลังฮีล %',HP_DRAIN_ATTACK:'ตีปกติดูดเลือด %',HP_DRAIN_SKILL:'สกิลดูดเลือด %',SP_DRAIN_ATTACK:'ตีปกติดูด SP %',SP_DRAIN_SKILL:'สกิลดูด SP %',STUN_RESIST:'กันสตัน %',MAX_WEIGHT:'น้ำหนักที่แบกได้',ATTACK_RANGE:'ระยะโจมตี (ช่อง)',ATK_STR_OVER_99:'ATK (เมื่อ STR เกิน 99)',RANGED_DAMAGE_REDUCTION:'ลดดาเมจระยะไกลที่ได้รับ %',PERFECT_DODGE:'Perfect Dodge',IGNORE_SIZE:'ยกเลิกการลงโทษขนาดของอาวุธ',BOSS_DAMAGE_REDUCTION:'ลดดาเมจจากบอส %',VS_BOSS:'ดาเมจใส่บอส/MVP %',VS_STATUS:'ดาเมจใส่เป้าที่ติดสถานะผิดปกติ %',PIERCE_RESIST:'ต้านการเจาะเกราะ %',HIT_STACK:'ตีเป้าเดิมครบ (ครั้ง) ครั้งถัดไปแรงขึ้น',HIT_STACK_PERCENT:'ดาเมจครั้งที่ครบ %',CAST_REDUCTION:'ลดเวลาร่าย %',MELEE_DAMAGE_REDUCTION:'ลดดาเมจประชิดที่ได้รับ %',MAGIC_DAMAGE_REDUCTION:'ลดดาเมจเวทที่ได้รับ %',DAMAGE_REDUCTION_VIT:'ลดดาเมจ 1% ทุก VIT 10 สูงสุด %',VS_SIZE_ALL:'ดาเมจใส่มอนทุกขนาด %',GEM_SKILL_DAMAGE:'ดาเมจสกิล %',MOVE_SPEED_PERCENT:'ความเร็วเดิน %'};
+const PER_TARGET = [
+  ['VS_ELEMENT_','ดาเมจใส่มอนธาตุ{n} %',EL],['VS_RACE_','ดาเมจใส่มอนเผ่า{n} %',RACE],['VS_SIZE_','ดาเมจใส่มอนขนาด{n} %',SIZE],
+  ['RESIST_ELEMENT_','ลดดาเมจจากธาตุ{n} %',EL],['RESIST_RACE_','ลดดาเมจจากมอนเผ่า{n} %',RACE],['PHYS_RESIST_RACE_','ลดดาเมจกายภาพจากมอนเผ่า{n} %',RACE],
+  ['MAGIC_RESIST_RACE_','ลดดาเมจเวทจากมอนเผ่า{n} %',RACE],['MAGIC_VS_RACE_','ดาเมจเวทใส่มอนเผ่า{n} %',RACE],['RESIST_SIZE_','ลดดาเมจจากมอนขนาด{n} %',SIZE],['ELEMENT_DAMAGE_','ดาเมจการโจมตีธาตุ{n} %',EL]];
+const EL_COLOR = {}; (DATA.elements.list||[]).forEach(e=>EL_COLOR[e.id]=e.color);
+const ELS = DATA.elements.list.map(e=>e.id);
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => (n ?? 0).toLocaleString('en-US');
+const pct = c => { const p = c*100; return (p >= 1 ? +p.toFixed(2) : +p.toPrecision(2)) + '%'; };
+function attrLabel(t){
+  if (ATTR[t]) return ATTR[t];
+  for (const [p, tpl, dict] of PER_TARGET) if (t.startsWith(p)) { const k = t.slice(p.length).toLowerCase(); return tpl.replace('{n}', dict[k] || k); }
+  return t;
+}
+function attrShort(type, value){
+  const l = attrLabel(type), p = / %$/.test(l);
+  return [p ? l.slice(0, -2) : l, `${value > 0 ? '+' : ''}${value}${p ? '%' : ''}`];
+}
+function attrText(a){
+  const [l, v] = attrShort(a.type, a.value);
+  let s = `${esc(l)} <b>${v}</b>`;
+  if (a.perRefine) s += ` <span class="note">(+${a.perRefine} ต่อการตีบวก)</span>`;
+  if (a.minRefine) s += ` <span class="note">(ตีบวก +${a.minRefine} ขึ้นไป)</span>`;
+  return s;
+}
+const elTag = (el, lv) => `<span class="el" style="background:${EL_COLOR[el]||'#888'}">${esc(EL[el]||el)}${lv ? ' ' + lv : ''}</span>`;
+const itemIcon = id => { const p = DATA.icons.items[id]; return p ? `${BASE}/art/icons/${p}` : ''; };
+const skillIcon = id => { const p = DATA.icons.skills[id]; return p ? `${BASE}/art/icons/${p}` : ''; };
+const monArt = id => { const f = DATA.monsterArt[id]; return f ? `${BASE}/art/monsters/${f}` : ''; };
+const img = (src, cls='') => src ? `<img src="${src}" alt="" loading="lazy" class="${cls}" onerror="this.style.visibility='hidden'">` : '';
+function mult(atk, def, lv){ const r = (DATA.elements.matrix[atk]||{})[def]; return r ? r[(lv||1)-1] : 1; }
+function mulChip(x){
+  const c = x === 0 ? 'b' : x < 1 ? 'w' : x > 1 ? 'g' : 'n';
+  return `<span class="mul ${c}">${x === 0 ? 'x0' : 'x' + (+x.toFixed(2))}</span>`;
+}
+const opts = (obj, all='ทั้งหมด', cur='') => `<option value="">${all}</option>` + Object.entries(obj).map(([k,v]) => `<option value="${esc(k)}"${k===cur?' selected':''}>${esc(v)}</option>`).join('');
+
+/* ---------- indexes ---------- */
+const itemById = new Map(DATA.items.map(i => [String(i.id), i]));
+const monById = new Map(DATA.monsters.map(m => [String(m.id), m]));
+const realMons = DATA.monsters.filter(m => !m.trainingDummy);
+const mapName = new Map(DATA.maps.map(m => [m.id, m.name]));
+const mapsById = new Map();
+for (const m of realMons) for (const s of (m.spawns||[])) {
+  let x = mapsById.get(s.mapId);
+  if (!x) mapsById.set(s.mapId, x = {id:s.mapId, name:s.map || mapName.get(s.mapId) || s.mapId, mons:new Map(), areas:new Set()});
+  const cur = x.mons.get(m.id) || {m, count:0, fixed:false};
+  cur.count += s.count || 0; cur.fixed = cur.fixed || s.fixed;
+  x.mons.set(m.id, cur); if (s.area) x.areas.add(s.area);
+}
+const MAPS = [...mapsById.values()].map(x => {
+  const ms = [...x.mons.values()].map(v => v.m);
+  const normal = ms.filter(m => !m.boss);
+  const lv = (normal.length ? normal : ms).map(m => m.level);
+  return {...x, list:[...x.mons.values()].sort((a,b)=>a.m.level-b.m.level), min:Math.min(...lv), max:Math.max(...lv), star:ms.some(m=>m.star), boss:ms.some(m=>m.boss)};
+}).sort((a,b) => a.min - b.min || a.max - b.max);
+const mapById = new Map(MAPS.map(m => [m.id, m]));
+const SB = DATA.skillBook;
+const classThai = new Map(SB.classes.map(c => [c.id, c.thai || c.name]));
+const className = new Map(SB.classes.map(c => [c.id, c.name]));
+
+const monLink = id => { const m = monById.get(String(id)); return m ? `<a class="mini" href="#monsters/${m.id}">${img(monArt(m.id))}${esc(m.name)}</a> <span class="note">Lv.${m.level}</span>` : `#${id}`; };
+const itemLink = id => { const i = itemById.get(String(id)); if (!i) return `#${id}`; const cat = i.type === 'Card' ? 'cards' : 'items'; return `<a class="mini r-${i.rarity}" href="#${cat}/${i.id}">${img(itemIcon(i.id))}${esc(i.name)}</a>`; };
+const mapLink = id => { const m = mapById.get(id); return m ? `<a href="#maps/${m.id}">${m.star ? '★ ' : ''}${esc(m.name)}</a>` : esc(mapName.get(id) || id); };
+
+/* ---------- shared detail blocks ---------- */
+function weaknessTable(m){
+  const rows = ELS.map(a => [a, mult(a, m.element, m.elementLevel)]).sort((x,y) => y[1]-x[1]);
+  return `<section><h2>ตีด้วยธาตุไหนแรง</h2>
+    <p class="note">มอนตัวนี้เป็น ${elTag(m.element, m.elementLevel)} — ตัวคูณดาเมจตามธาตุที่ใช้ตี (จากตารางธาตุของวิกิ)</p>
+    <div class="tags" style="margin-top:10px">${rows.map(([a,x]) => `<span class="tag">${elTag(a)} ${mulChip(x)}</span>`).join('')}</div></section>`;
+}
+/* ---------- weapon card calculator (map page) ---------- */
+const CALC_KEY = 'aw-calc';
+const calc = {slots:3, els:ELS.slice(), excl:[], mode:'melee', magicElSize:true};
+try { Object.assign(calc, JSON.parse(localStorage.getItem(CALC_KEY) || '{}')); } catch {}
+calc.base = Object.assign({melee:+calc.melee || 0, ranged:0, magic:0}, calc.base || {});
+const saveCalc = () => { try { localStorage.setItem(CALC_KEY, JSON.stringify(calc)); } catch {} };
+// attack styles: which "% damage" stat a style uses, and which per-target card bonuses apply to it
+const MODES = {
+  melee:  {label:'ประชิด (กายภาพ)', pct:'ดาเมจประชิด', hint:'พิษ = Venom Coat ของ Assassin · ไฟ/น้ำ/ลม/ดิน/ศักดิ์สิทธิ์ = ใบ Converter'},
+  ranged: {label:'ตีไกล (กายภาพ)', pct:'ดาเมจระยะไกล', hint:'ธาตุของลูกธนู/กระสุน หรือใบ Converter'},
+  magic:  {label:'เวท', pct:'ดาเมจเวท', hint:'ธาตุของสกิลเวทที่ใช้ เช่น Flame Lance = ไฟ'},
+};
+function cardBonus(c){
+  const b = {el:{}, race:{}, mrace:{}, size:{}, melee:0, ranged:0, magic:0}; let any = false;
+  for (const a of c.attributes || []) {
+    for (const [p, k] of [['VS_ELEMENT_','el'],['MAGIC_VS_RACE_','mrace'],['VS_RACE_','race'],['VS_SIZE_','size']]) if (a.type.startsWith(p)) {
+      const key = a.type.slice(p.length).toLowerCase(); b[k][key] = (b[k][key] || 0) + a.value; any = true; break;
+    }
+    if (a.type === 'VS_SIZE_ALL') { for (const s of SIZES0) b.size[s] = (b.size[s] || 0) + a.value; any = true; }
+    if (a.type === 'MELEE_DAMAGE_PERCENT') { b.melee += a.value; any = true; }
+    if (a.type === 'RANGE_DAMAGE_PERCENT') { b.ranged += a.value; any = true; }
+    if (a.type === 'MAGIC_DAMAGE_PERCENT') { b.magic += a.value; any = true; }
+  }
+  return any ? b : null;
+}
+const SIZES0 = Object.keys(SIZE);
+// per-target bonuses that count for the current style
+function modeParts(b){
+  const m = calc.mode, phys = m !== 'magic', es = phys || calc.magicElSize;
+  return {el: es ? b.el : {}, race: phys ? b.race : b.mrace, size: es ? b.size : {}, pct: b[m] || 0};
+}
+const cardUseful = (b, ms) => { const p = modeParts(b); return p.pct > 0 || ms.some(m => p.el[m.element] || p.race[m.race] || p.size[m.size]); };
+const WCARDS = DATA.items.filter(i => i.type === 'Card' && (i.cardSlotTypes || []).includes('Weapon') && i.droppedBy?.length)
+  .map(c => ({c, b:cardBonus(c)})).filter(x => x.b);
+function combos(arr, k, start = 0, pre = [], out = []){
+  if (pre.length === k) { out.push(pre); return out; }
+  for (let i = start; i < arr.length; i++) combos(arr, k, i, [...pre, arr[i]], out);
+  return out;
+}
+function evalCombo(ms, atk, combo){
+  const t = {el:{}, race:{}, size:{}, pct:0};
+  for (const x of combo) {
+    const p = modeParts(x.b);
+    for (const k of ['el','race','size']) for (const [kk, v] of Object.entries(p[k])) t[k][kk] = (t[k][kk] || 0) + v;
+    t.pct += p.pct;
+  }
+  const base = +calc.base[calc.mode] || 0;
+  const xs = ms.map(m => mult(atk, m.element, m.elementLevel) * (1 + (t.el[m.element] || 0)/100) * (1 + (t.race[m.race] || 0)/100)
+    * (1 + (t.size[m.size] || 0)/100) * (1 + (base + t.pct)/100) / (1 + base/100));
+  const eff = xs.some(x => x === 0) ? 0 : ms.reduce((s,m) => s + m.hp, 0) / ms.reduce((s,m,i) => s + m.hp / xs[i], 0);
+  return {xs, eff};
+}
+/* ---------- which monsters on the map you actually fight (shared by all calculators) ---------- */
+calc.pick = calc.pick || {};
+const defaultPick = mp => { const nb = mp.list.filter(x => !x.m.boss); return (nb.length ? nb : mp.list).map(x => x.m.id); };
+const pickedIds = mp => calc.pick[mp.id] || defaultPick(mp);
+const pickedMons = mp => { const ids = pickedIds(mp); return mp.list.map(x => x.m).filter(m => ids.includes(m.id)); };
+function pickSection(mp){
+  const ids = pickedIds(mp);
+  return `<section id="pk"><h2>เลือกมอนที่จะตี</h2>
+    <p class="note">ติ๊กเฉพาะมอนที่จะฟาร์มจริง — ตารางธาตุ ตัวคำนวณการ์ดอาวุธ และการ์ดป้องกันด้านล่างจะคิดจากมอนที่เลือกเท่านั้น · ค่าเริ่มต้น = ทุกตัวยกเว้นบอส</p>
+    <div class="cc-ctl">${mp.list.map(({m}) => `<label><input type="checkbox" data-pick="${m.id}"${ids.includes(m.id) ? ' checked' : ''}>${img(monArt(m.id), 'pk-img')}${m.boss ? '👑 ' : ''}${esc(m.name)} <span class="note">Lv.${m.level} ${EL[m.element]}${m.elementLevel}</span></label>`).join('')}</div>
+    <div class="cc-ctl"><button class="chipbtn" data-pick-all="all">เลือกทั้งหมด</button>${mp.boss ? `<button class="chipbtn" data-pick-all="noboss">ทั้งหมดยกเว้นบอส</button>` : ''}<button class="chipbtn" data-pick-all="none">ไม่เลือกเลย</button></div></section>`;
+}
+function runElem(mp){
+  const out = $('#el-out'); if (!out) return;
+  const ms = pickedMons(mp);
+  if (!ms.length) { out.innerHTML = `<p class="empty">เลือกมอนอย่างน้อย 1 ตัว</p>`; return; }
+  const rows = ELS.map(a => {
+    const xs = ms.map(m => mult(a, m.element, m.elementLevel));
+    const zero = xs.some(x => x === 0);
+    const eff = zero ? 0 : ms.reduce((s,m)=>s+m.hp,0) / ms.reduce((s,m,i)=>s+m.hp/xs[i],0);
+    return {a, xs, eff, zero};
+  }).sort((x,y) => (x.zero - y.zero) || (y.eff - x.eff));
+  out.innerHTML = `<div class="tw"><table><tr><th>ธาตุที่ใช้ตี</th>${ms.map(m => `<th class="num">${esc(m.name)}</th>`).join('')}<th class="num">เฉลี่ย</th></tr>
+    ${rows.map((r,i) => `<tr class="${i === 0 && !r.zero ? 'best' : ''}"><td>${elTag(r.a)}</td>${r.xs.map(x => `<td class="num">${mulChip(x)}</td>`).join('')}<td class="num">${r.zero ? '<span class="note">มีตัวตีไม่เข้า</span>' : '<b>x' + r.eff.toFixed(2) + '</b>'}</td></tr>`).join('')}
+    </table></div>`;
+}
+const runMap = mp => { runElem(mp); runCalc(mp); runDef(mp); };
+
+function calcSection(){
+  const M = MODES[calc.mode] || MODES.melee;
+  const magicNote = calc.mode === 'magic'
+    ? `สายเวท: นับ "ดาเมจเวทใส่มอนเผ่า" (ไม่นับ "ดาเมจใส่มอนเผ่า" ซึ่งเกมแยกไว้สำหรับกายภาพ) · การ์ดธาตุ/ขนาด เกมไม่ได้ระบุว่าใช้กับเวทได้ไหม — ปิดได้ที่ช่องติ๊กด้านบน · การ์ดอาวุธที่ช่วยเวทโดยตรงแทบไม่มี (Lich, Morvath, Voltaryx ฯลฯ อยู่ช่องอื่น) · `
+    : '';
+  return `<section id="cc"><h2>คำนวณการ์ดอาวุธ</h2>
+    <p class="note">หาชุดการ์ดอาวุธที่ทำให้ฆ่ามอนที่เลือกได้เร็วที่สุด · ตั้งค่าที่นี่ใช้กับทุกแผนที่</p>
+    <div class="cc-ctl">
+      <span class="note">สายโจมตี:</span>${Object.entries(MODES).map(([k, v]) => `<label><input type="radio" name="ccmode" data-cc-mode="${k}"${k === calc.mode ? ' checked' : ''}> ${v.label}</label>`).join('')}
+    </div>
+    <div class="cc-ctl">
+      <label>ช่องการ์ด <select data-cc="slots">${[1,2,3,4].map(n => `<option${n == calc.slots ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label>${M.pct}ที่มีอยู่แล้ว <input type="number" data-cc-base min="0" max="500" step="1" value="${+calc.base[calc.mode] || 0}" style="width:72px"> %</label>
+      ${calc.mode === 'magic' ? `<label><input type="checkbox" data-cc-mes${calc.magicElSize ? ' checked' : ''}> นับการ์ดธาตุ/ขนาดกับเวทด้วย</label>` : ''}
+    </div>
+    <div class="note" style="margin-bottom:4px">ธาตุที่ตีได้ (กดเพื่อเปิด/ปิด) — ${M.hint}</div>
+    <div class="cc-els">${ELS.map(e => `<label class="${calc.els.includes(e) ? 'on' : ''}"><input type="checkbox" data-cc-el="${e}"${calc.els.includes(e) ? ' checked' : ''}>${elTag(e)}</label>`).join('')}</div>
+    <div id="cc-excl"></div><div id="cc-out"></div>
+    <p class="note" style="margin-top:10px">${magicNote}สูตรที่ใช้: การ์ดประเภทเดียวกันบวกกัน ต่างประเภท (ธาตุ / เผ่า / ขนาด / ${M.pct} %) คูณกัน แบบ RO — ยังไม่ได้ยืนยันกับเกมนี้ ·
+    ${M.pct} % ของการ์ดบวกรวมกับค่าที่มีอยู่แล้ว · ถือว่ามอนทุกชนิดเกิดเท่ากัน ถ่วงตาม HP · ไม่รวมการ์ดที่เพิ่ม ATK/MATK ตัวเลขตายตัว การ์ดที่มีผลเฉพาะสกิล และการ์ดที่ไม่มีแหล่งดรอป</p></section>`;
+}
+function runCalc(mp){
+  const out = $('#cc-out'); if (!out) return;
+  const use = pickedMons(mp);
+  if (!use.length) { out.innerHTML = `<p class="empty">เลือกมอนอย่างน้อย 1 ตัว</p>`; $('#cc-excl').innerHTML = ''; return; }
+  const relevant = WCARDS.filter(x => !calc.excl.includes(x.c.id) && cardUseful(x.b, use));
+  $('#cc-excl').innerHTML = calc.excl.length ? `<div class="note">ไม่ใช้การ์ด (กดเพื่อเอากลับมา): ${calc.excl.map(id => `<button class="chipbtn" data-cc-in="${id}">${esc((itemById.get(String(id))?.name || id).replace(/ Card$/, ''))} ↺</button>`).join('')}</div>` : '';
+  if (!calc.els.length) { out.innerHTML = `<p class="empty">เลือกธาตุที่ตีได้อย่างน้อย 1 ธาตุ</p>`; return; }
+  if (!relevant.length) { out.innerHTML = `<p class="empty">ไม่มีการ์ดอาวุธที่ช่วยสาย${esc(MODES[calc.mode].label)}กับมอนที่เลือก — เลือกธาตุให้เหมาะกับมอนแทน (ดูตาราง "ใช้ธาตุไหนฟาร์มดี")</p>`; return; }
+  const base =Math.max(0, ...calc.els.map(a => evalCombo(use, a, []).eff));
+  const k = Math.max(1, Math.min(4, +calc.slots || 3));
+  const res = [];
+  for (const atk of calc.els) for (const cb of combos(relevant, k)) { const r = evalCombo(use, atk, cb); if (r.eff > 0) res.push({atk, cb, ...r}); }
+  res.sort((a, b) => b.eff - a.eff);
+  const top = res.slice(0, 10);
+  if (!top.length) { out.innerHTML = `<p class="empty">ไม่มีชุดที่ตีเข้าทุกตัวด้วยธาตุที่เลือก</p>`; return; }
+  const cardCell = cb => {
+    const cnt = new Map(); cb.forEach(x => cnt.set(x.c.id, (cnt.get(x.c.id) || 0) + 1));
+    return `<div class="cc-cards">${[...cnt].map(([id, n]) => `<span><a class="mini" href="#cards/${id}">${img(itemIcon(id))}${esc((itemById.get(String(id))?.name || id).replace(/ Card$/, ''))}</a>${n > 1 ? ` <b>×${n}</b>` : ''}<button class="x" title="ไม่มี/ซื้อไม่ได้ — ตัดการ์ดนี้ออก" data-cc-ex="${id}">✕</button></span>`).join('')}</div>`;
+  };
+  out.innerHTML = `<div class="tw"><table><tr><th>#</th><th>การ์ด</th><th>ธาตุ</th>${use.map(m => `<th class="num">${esc(m.name)}</th>`).join('')}<th class="num">เฉลี่ย</th><th class="num">เทียบไม่ใส่การ์ด</th></tr>
+    ${top.map((r, i) => `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td>${cardCell(r.cb)}</td><td>${elTag(r.atk)}</td>${r.xs.map(x => `<td class="num">${mulChip(x)}</td>`).join('')}<td class="num"><b>x${r.eff.toFixed(2)}</b></td><td class="num">${base ? `+${Math.round((r.eff / base - 1) * 100)}%` : '-'}</td></tr>`).join('')}
+  </table></div><p class="note">กด ✕ ข้างชื่อการ์ดที่ไม่มีหรือซื้อไม่ไหว แล้วตารางจะคำนวณใหม่โดยไม่ใช้การ์ดนั้น · "เทียบไม่ใส่การ์ด" = เทียบกับธาตุที่ดีที่สุดโดยไม่ใส่การ์ด (x${base.toFixed(2)})</p>`;
+}
+
+/* ---------- defensive card calculator (map page) ---------- */
+calc.def = Object.assign({dr:0, hp:10000, head:1, normEl:'neutral', skill:50, slots:{Armor:true, Cape:true, Pants:true, Boot:true}}, calc.def || {});
+const RACES = Object.keys(RACE), SIZES = Object.keys(SIZE);
+// vector layout: 0 dr,1 meleeRed,2 rangedRed,3 magicRed,4 hp,5 hpPct, then resEl, resRace, physRace, magRace, resSize
+const V = {dr:0, melee:1, ranged:2, magic:3, hp:4, hpPct:5, el:6, race:6 + ELS.length, pr:6 + ELS.length + RACES.length, mr:6 + ELS.length + 2*RACES.length, size:6 + ELS.length + 3*RACES.length};
+const VLEN = V.size + SIZES.length;
+const DSLOTS = [['Armor','เสื้อ'],['Cape','ผ้าคลุม'],['Shield','โล่'],['Pants','กางเกง'],['Boot','รองเท้า'],['Head','หมวก']];
+function defVec(c){
+  const v = new Float64Array(VLEN); let any = false;
+  const put = (i, x) => { if (i >= 0) { v[i] += x; any = true; } };
+  for (const a of c.attributes || []) {
+    const t = a.type, low = s => t.slice(s.length).toLowerCase();
+    if (t === 'DAMAGE_REDUCTION') put(V.dr, a.value);
+    else if (t === 'MELEE_DAMAGE_REDUCTION') put(V.melee, a.value);
+    else if (t === 'RANGED_DAMAGE_REDUCTION') put(V.ranged, a.value);
+    else if (t === 'MAGIC_DAMAGE_REDUCTION') put(V.magic, a.value);
+    else if (t === 'MAXHP') put(V.hp, a.value);
+    else if (t === 'MAXHP_PERCENT') put(V.hpPct, a.value);
+    else if (t.startsWith('RESIST_ELEMENT_')) put(V.el + ELS.indexOf(low('RESIST_ELEMENT_')), a.value);
+    else if (t.startsWith('PHYS_RESIST_RACE_')) put(V.pr + RACES.indexOf(low('PHYS_RESIST_RACE_')), a.value);
+    else if (t.startsWith('MAGIC_RESIST_RACE_')) put(V.mr + RACES.indexOf(low('MAGIC_RESIST_RACE_')), a.value);
+    else if (t.startsWith('RESIST_RACE_')) put(V.race + RACES.indexOf(low('RESIST_RACE_')), a.value);
+    else if (t.startsWith('RESIST_SIZE_')) put(V.size + SIZES.indexOf(low('RESIST_SIZE_')), a.value);
+  }
+  return any ? v : null;
+}
+const DCARDS = DATA.items.filter(i => i.type === 'Card' && i.droppedBy?.length).map(c => ({c, v:defVec(c)})).filter(x => x.v);
+const slotOf = c => (c.cardSlotTypes || []).some(s => ['Helmet','HeadMid','HeadLow'].includes(s)) ? 'Head' : (c.cardSlotTypes || [])[0];
+function mapHits(ms){
+  const d = calc.def, hits = [];
+  const wsum = ms.reduce((s, m) => s + (m.atk + m.atkMax) / 2, 0) || 1;
+  for (const m of ms) {
+    const w = (m.atk + m.atkMax) / 2 / wsum, sk = m.skills || [], share = sk.length ? Math.min(100, Math.max(0, +d.skill || 0)) / 100 : 0;
+    const base = {m, race:RACES.indexOf(m.race), size:SIZES.indexOf(m.size)};
+    hits.push({...base, el:ELS.indexOf(d.normEl === 'own' ? m.element : 'neutral'), phys:!m.magicAttack, melee:m.attackRangeTiles < 4, w:w * (1 - share)});
+    for (const s of sk) hits.push({...base, el:ELS.indexOf(s.element || 'neutral'), phys:s.kind !== 'magic', melee:(s.rangeTiles || 0) < 4, w:w * share / sk.length});
+  }
+  return hits.filter(h => h.w > 0);
+}
+function defScore(T, hits){
+  const d = calc.def, bdr = Math.min(99, +d.dr || 0), hp = Math.max(1, +d.hp || 1);
+  const pos = x => Math.max(0, x);
+  const fdr = pos(1 - (bdr + T[V.dr]) / 100) / (1 - bdr / 100);
+  let dmg = 0;
+  for (const h of hits) {
+    let f = fdr * pos(1 - T[V.el + h.el] / 100) * pos(1 - (T[V.race + h.race] + T[(h.phys ? V.pr : V.mr) + h.race]) / 100) * pos(1 - T[V.size + h.size] / 100);
+    f *= h.phys ? pos(1 - T[h.melee ? V.melee : V.ranged] / 100) : pos(1 - T[V.magic] / 100);
+    dmg += h.w * f;
+  }
+  const hpf = (hp * (1 + T[V.hpPct] / 100) + T[V.hp]) / hp;
+  return {dmg, hpf, life: hpf / Math.max(dmg, 1e-9)};
+}
+function runDef(mp){
+  const out1 = $('#cd-out1'); if (!out1) return;
+  const ms = pickedMons(mp);
+  if (!ms.length) { out1.innerHTML = `<p class="empty">เลือกมอนอย่างน้อย 1 ตัว</p>`; return; }
+  const hits = mapHits(ms), d = calc.def;
+  const usedEl = new Set(hits.map(h => h.el)), usedRace = new Set(hits.map(h => h.race)), usedSize = new Set(hits.map(h => h.size));
+  const anyPM = hits.some(h => h.phys && h.melee), anyPR = hits.some(h => h.phys && !h.melee), anyMag = hits.some(h => !h.phys);
+  const useful = v => v[V.dr] || v[V.hp] || v[V.hpPct] || (anyPM && v[V.melee]) || (anyPR && v[V.ranged]) || (anyMag && v[V.magic])
+    || [...usedEl].some(i => v[V.el + i]) || [...usedRace].some(i => v[V.race + i] || v[V.pr + i] || v[V.mr + i]) || [...usedSize].some(i => v[V.size + i]);
+  const pool = {}; for (const [s] of DSLOTS) pool[s] = [];
+  const same = new Map(); // cards with identical defensive stats in the same slot are interchangeable: keep one, list the rest
+  for (const x of DCARDS) {
+    const s = slotOf(x.c); if (!pool[s] || calc.excl.includes(x.c.id) || !useful(x.v)) continue;
+    const key = s + '|' + Array.from(x.v).join(',');
+    if (same.has(key)) same.get(key).alts.push(x.c); else { const e = {...x, alts:[]}; same.set(key, e); pool[s].push(e); }
+  }
+  const solve = withShield => {
+    const slots = [];
+    for (const [s] of DSLOTS) {
+      if (s === 'Shield') { if (withShield) slots.push({s, opts:[null, ...pool.Shield]}); continue; }
+      if (s === 'Head') { const n = Math.max(0, Math.min(3, +d.head || 0)); for (let i = 0; i < n; i++) slots.push({s, opts:[null, ...pool.Head], head:i}); continue; }
+      if (d.slots[s]) slots.push({s, opts:[null, ...pool[s]]});
+    }
+    const T = new Float64Array(VLEN), pick = [], top = [];
+    const rec = (i, minHead) => {
+      if (i === slots.length) {
+        const r = defScore(T, hits);
+        if (top.some(t => Math.abs(t.life - r.life) < 1e-9)) return;
+        if (top.length < 6 || r.life > top[top.length - 1].life) {
+          top.push({...r, pick:pick.slice()}); top.sort((a, b) => b.life - a.life); if (top.length > 6) top.pop();
+        }
+        return;
+      }
+      const sl = slots[i], start = sl.head !== undefined && sl.head > 0 ? minHead : 0;
+      for (let k = start; k < sl.opts.length; k++) {
+        const o = sl.opts[k];
+        if (o) for (let j = 0; j < VLEN; j++) T[j] += o.v[j];
+        pick.push(o ? {s:sl.s, c:o.c, alts:o.alts} : null);
+        rec(i + 1, sl.head !== undefined ? k : 0);
+        pick.pop();
+        if (o) for (let j = 0; j < VLEN; j++) T[j] -= o.v[j];
+      }
+    };
+    rec(0, 0);
+    return {top, base:defScore(new Float64Array(VLEN), hits)};
+  };
+  const table = ({top, base}) => !top.length ? `<p class="empty">ไม่มีการ์ดที่ช่วยในแผนที่นี้</p>` : `<div class="tw"><table><tr><th>#</th><th>การ์ด</th><th class="num">ดาเมจที่รับ</th><th class="num">Max HP</th><th class="num">ทนได้นานขึ้น</th></tr>
+    ${top.map((r, i) => {
+      const cards = r.pick.filter(Boolean);
+      const link = c => `<a class="mini" href="#cards/${c.id}">${img(itemIcon(c.id))}${esc(c.name.replace(/ Card$/, ''))}</a><button class="x" title="ไม่มี/ซื้อไม่ได้ — ตัดการ์ดนี้ออก" data-cc-ex="${c.id}">✕</button>`;
+      return `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td><div class="cc-cards">${cards.length ? cards.map(p => `<span><span class="note">${DSLOTS.find(s => s[0] === p.s)[1]}:</span> ${[p.c, ...(p.alts || [])].map(link).join(' <span class="note">หรือ</span> ')}</span>`).join('') : '<span class="note">ไม่ใส่</span>'}</div></td>
+        <td class="num">${r.dmg < base.dmg ? `<span class="mul g">−${Math.round((1 - r.dmg / base.dmg) * 100)}%</span>` : '<span class="mul n">0%</span>'}</td>
+        <td class="num">${r.hpf > 1 ? `+${Math.round((r.hpf - 1) * 100)}%` : '-'}</td>
+        <td class="num"><b>+${Math.round((r.life / base.life - 1) * 100)}%</b></td></tr>`;
+    }).join('')}</table></div>`;
+  out1.innerHTML = `<h3 style="margin:14px 0 6px;font-size:14px">ใส่โล่ได้ (มือเดียว + โล่)</h3>` + table(solve(true))
+    + `<h3 style="margin:18px 0 6px;font-size:14px">ใส่โล่ไม่ได้ (คาตาร์ / อาวุธสองมือ / ถือสองมือ)</h3>` + table(solve(false));
+}
+function defSection(){
+  const d = calc.def;
+  return `<section id="cd"><h2>คำนวณการ์ดป้องกัน</h2>
+    <p class="note">หาชุดการ์ดที่ทำให้ยืนในแผนที่นี้ได้นานที่สุด (ลดดาเมจที่รับ + เพิ่ม Max HP) · ตั้งค่าที่นี่ใช้กับทุกแผนที่</p>
+    <div class="cc-ctl">
+      <label>ลดดาเมจที่มีอยู่แล้ว <input type="number" data-cd="dr" min="0" max="95" value="${+d.dr || 0}" style="width:64px"> %</label>
+      <label>Max HP ตอนนี้ <input type="number" data-cd="hp" min="1" step="100" value="${+d.hp || 10000}" style="width:90px"></label>
+      <label>หมวกที่มีรูการ์ด <select data-cd="head">${[0,1,2,3].map(n => `<option${n == d.head ? ' selected' : ''}>${n}</option>`).join('')}</select> ชิ้น</label>
+    </div>
+    <div class="cc-ctl">
+      <span class="note">ช่องที่มีรูการ์ด:</span>${DSLOTS.filter(([s]) => !['Shield','Head'].includes(s)).map(([s, l]) => `<label><input type="checkbox" data-cd-slot="${s}"${d.slots[s] ? ' checked' : ''}> ${l}</label>`).join('')}
+    </div>
+    <div class="cc-ctl">
+      <label>ธาตุตอนมอนตีปกติ <select data-cd="normEl"><option value="neutral"${d.normEl !== 'own' ? ' selected' : ''}>ไร้ธาตุ (แบบ RO)</option><option value="own"${d.normEl === 'own' ? ' selected' : ''}>ธาตุเดียวกับตัวมอน</option></select></label>
+      <label>ดาเมจที่มาจากสกิลมอน <input type="number" data-cd="skill" min="0" max="100" value="${+d.skill}" style="width:60px"> %</label>
+    </div>
+    <div id="cd-out1"></div>
+    <p class="note" style="margin-top:10px">"ทนได้นานขึ้น" = Max HP ที่เพิ่ม ÷ ดาเมจที่รับ เทียบกับไม่ใส่การ์ด · ถ่วงน้ำหนักตาม ATK ของมอนแต่ละตัว (ไม่นับบอส) ·
+    ใช้ระยะโจมตี 4 ช่องขึ้นไปเป็น "ระยะไกล" · ลดดาเมจ % ของการ์ดบวกรวมกับค่าที่มีอยู่แล้ว ต่างประเภทคูณกัน (แบบ RO — ยังไม่ยืนยันกับเกมนี้) ·
+    ไม่รวม DEF / MDEF / FLEE / บล็อก / VIT และไม่รู้ว่าเกมมีเพดานลดดาเมจหรือไม่ · ปุ่ม ✕ ใช้รายการเดียวกับตัวคำนวณการ์ดอาวุธ</p></section>`;
+}
+
+function itemDetail(i){
+  const facts = [];
+  facts.push(['ประเภท', ITEMTYPE[i.type] || i.type]);
+  if (i.equipmentType && i.equipmentType !== 'None') facts.push(['ช่อง', SLOT[i.equipmentType] || i.equipmentType]);
+  if (i.weaponType && i.weaponType !== 'None') facts.push(['อาวุธ', WEAPON[i.weaponType] || i.weaponType]);
+  if (i.weaponLevel) facts.push(['เลเวลอาวุธ', i.weaponLevel]);
+  if (i.equipLevelMin) facts.push(['เลเวลที่ใส่ได้', i.equipLevelMin]);
+  if (i.slots) facts.push(['ช่องการ์ด', i.slots]);
+  if (i.cardSlotTypes?.length) facts.push(['ใส่ในช่อง', i.cardSlotTypes.map(s => SLOT[s]||s).join(', ')]);
+  if (i.element) facts.push(['ธาตุ', EL[i.element] || i.element]);
+  facts.push(['น้ำหนัก', i.weight]); facts.push(['ราคาขาย NPC', num(i.sellPrice) + ' z']);
+  if (i.refineable) facts.push(['ตีบวกได้', 'ได้']);
+  if (i.maxStack > 1) facts.push(['ซ้อนได้', i.maxStack]);
+  let h = `<div class="dh"><div class="big">${img(itemIcon(i.id))}</div><div>
+    <h1 class="r-${i.rarity}">${esc(i.name)}${i.slots ? ` [${i.slots}]` : ''}</h1>
+    <div class="sub">#${i.id} · ${esc(ITEMTYPE[i.type]||i.type)} · <span class="r-${i.rarity}">${esc(RARITY[i.rarity]||i.rarity)}</span></div>
+    ${i.jobs?.length ? `<div class="tags">${i.jobs.map(j => `<span class="tag">${esc(j)}</span>`).join('')}</div>` : ''}
+  </div></div>`;
+  if (i.description) h += `<section><p>${esc(i.description)}</p></section>`;
+  if (i.attributes?.length || i.specials?.length || i.effects?.length) {
+    h += `<section><h2>ความสามารถ</h2><ul class="plain">`;
+    h += (i.attributes||[]).map(a => `<li>${attrText(a)}</li>`).join('');
+    h += (i.specials||[]).map(s => `<li>${esc(s)}</li>`).join('');
+    h += (i.effects||[]).map(e => `<li>${esc(e.attribute)} ${e.amount > 0 ? '+' : ''}${esc(e.amount)}${e.durationSeconds ? ` นาน ${e.durationSeconds} วิ` : ''} <span class="note">(${esc(e.mode)})</span></li>`).join('');
+    h += `</ul></section>`;
+  }
+  if (i.album?.length) h += `<section><h2>โบนัสสมุดการ์ด (ลงทะเบียน)</h2><ul class="plain">${i.album.map(a => { const [l, v] = attrShort(a.stat || a.type, a.value); return `<li>${esc(l)} <b>${v}</b></li>`; }).join('')}</ul></section>`;
+  if (i.set) h += `<section><h2>เซ็ต</h2>${generic(i.set)}</section>`;
+  h += `<section><h2>ข้อมูล</h2><div class="kv">${facts.map(([k,v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></section>`;
+  if (i.droppedBy?.length) {
+    const rows = [...i.droppedBy].sort((a,b) => b.chance - a.chance);
+    h += `<section><h2>ดรอปจาก (${rows.length})</h2><div class="tw"><table><tr><th>มอนสเตอร์</th><th>แผนที่</th><th class="num">โอกาส</th></tr>${rows.map(d => {
+      const m = monById.get(String(d.monsterId)); const maps = m ? [...new Set((m.spawns||[]).map(s=>s.mapId))] : [];
+      return `<tr><td>${monLink(d.monsterId)}</td><td>${maps.map(mapLink).join(', ') || '<span class="note">-</span>'}</td><td class="num">${pct(d.chance)}${d.max > 1 ? ` ×${d.min}-${d.max}` : ''}</td></tr>`;
+    }).join('')}</table></div></section>`;
+  }
+  if (i.soldBy?.length) h += `<section><h2>ขายที่</h2><ul class="plain">${i.soldBy.map(s => `<li>${esc(s.shop)}${s.npcs?.length ? ` <span class="note">(${esc(s.npcs.join(', '))})</span>` : ''} — <b>${num(s.price)} z</b></li>`).join('')}</ul></section>`;
+  if (i.uses?.length) h += `<section><h2>ได้จาก / ใช้ทำ</h2><ul class="plain">${i.uses.map(u => `<li>${esc(u)}</li>`).join('')}</ul></section>`;
+  if (i.craft) h += `<section><h2>คราฟต์</h2>${generic(i.craft)}</section>`;
+  if (i.ascend) h += `<section><h2>อัปเกรด (Ascend)</h2>${generic(i.ascend)}</section>`;
+  return h;
+}
+function generic(v){
+  if (v == null) return '';
+  if (Array.isArray(v)) return `<ul class="plain">${v.map(x => `<li>${typeof x === 'object' ? generic(x) : esc(x)}</li>`).join('')}</ul>`;
+  if (typeof v === 'object') {
+    if (v.itemId && itemById.has(String(v.itemId))) return `${itemLink(v.itemId)}${v.amount ? ` ×${v.amount}` : ''}`;
+    return `<div class="kv">${Object.entries(v).map(([k,x]) => `<div><span>${esc(k)}</span><b>${typeof x === 'object' ? generic(x) : esc(x)}</b></div>`).join('')}</div>`;
+  }
+  return esc(v);
+}
+
+/* ---------- categories ---------- */
+const CATS = {
+  items: {
+    label:'ไอเทม', icon:'',
+    all: DATA.items.filter(i => i.type !== 'Card'),
+    filters: st => `<input type="search" data-k="q" placeholder="ค้นหาชื่อไอเทม หรือ #id" value="${esc(st.q)}">
+      <select data-k="type">${opts(Object.fromEntries(Object.entries(ITEMTYPE).filter(([k])=>k!=='Card')), 'ทุกประเภท', st.type)}</select>
+      <select data-k="slot">${opts(SLOT, 'ทุกช่อง', st.slot)}</select>
+      <select data-k="weapon">${opts(WEAPON, 'ทุกอาวุธ', st.weapon)}</select>`,
+    match: (i, st) => (!st.type || i.type === st.type) && (!st.slot || i.equipmentType === st.slot) && (!st.weapon || i.weaponType === st.weapon),
+    text: i => `${i.name} #${i.id}`,
+    row: i => ({ic: img(itemIcon(i.id)), name: `<span class="r-${i.rarity}">${esc(i.name)}${i.slots ? ` [${i.slots}]` : ''}</span>`,
+      sub: [ITEMTYPE[i.type]||i.type, i.equipmentType !== 'None' ? (SLOT[i.equipmentType]||i.equipmentType) : '', i.weaponType !== 'None' ? (WEAPON[i.weaponType]||i.weaponType) : ''].filter(Boolean).join(' · '),
+      right: i.equipLevelMin ? `Lv.${i.equipLevelMin}` : ''}),
+    get: id => itemById.get(id), detail: itemDetail,
+  },
+  cards: {
+    label:'การ์ด',
+    all: DATA.items.filter(i => i.type === 'Card'),
+    filters: st => `<input type="search" data-k="q" placeholder="ค้นหาการ์ด หรือความสามารถ เช่น ธาตุลม" value="${esc(st.q)}">
+      <select data-k="slot">${opts(Object.fromEntries(['Weapon','Armor','Shield','Cape','Helmet','Boot','Acc','Pants'].map(k=>[k,SLOT[k]])), 'ทุกช่อง', st.slot)}</select>`,
+    match: (i, st) => !st.slot || i.cardSlotTypes.includes(st.slot),
+    text: i => `${i.name} #${i.id} ${(i.attributes||[]).map(a=>attrLabel(a.type)).join(' ')} ${(i.specials||[]).join(' ')} ${(i.droppedBy||[]).map(d=>monById.get(String(d.monsterId))?.name||'').join(' ')}`,
+    row: i => ({ic: img(itemIcon(i.id)), name: esc(i.name.replace(/ Card$/, '')),
+      sub: [(i.attributes||[]).map(a => attrShort(a.type, a.value).join(' ')).join(', '), ...(i.specials||[])].filter(Boolean).map(esc).join(' · '),
+      right: (i.cardSlotTypes||[]).map(s => SLOT[s]||s)[0] || ''}),
+    get: id => itemById.get(id), detail: itemDetail,
+  },
+  monsters: {
+    label:'มอนสเตอร์',
+    all: [...realMons].sort((a,b) => a.level - b.level),
+    filters: st => `<input type="search" data-k="q" placeholder="ค้นหามอน หรือชื่อแผนที่" value="${esc(st.q)}">
+      <select data-k="el">${opts(EL, 'ทุกธาตุ', st.el)}</select>
+      <select data-k="race">${opts(RACE, 'ทุกเผ่า', st.race)}</select>
+      <select data-k="size">${opts(SIZE, 'ทุกขนาด', st.size)}</select>
+      <label><input type="checkbox" data-k="star"${st.star?' checked':''}> มอนดาว</label>
+      <label><input type="checkbox" data-k="boss"${st.boss?' checked':''}> บอส</label>`,
+    match: (m, st) => (!st.el || m.element === st.el) && (!st.race || m.race === st.race) && (!st.size || m.size === st.size) && (!st.star || m.star) && (!st.boss || m.boss),
+    text: m => `${m.name} #${m.id} ${(m.spawns||[]).map(s=>s.map).join(' ')}`,
+    row: m => ({ic: img(monArt(m.id)), name: `${m.star ? '<span title="มอนดาว" style="color:var(--accent)">★</span> ' : ''}${m.boss ? '👑 ' : ''}${esc(m.name)}`,
+      sub: `${EL[m.element]} ${m.elementLevel} · ${RACE[m.race]||m.race} · ${SIZE[m.size]||m.size}`, right: `Lv.${m.level}`}),
+    get: id => monById.get(id),
+    detail: m => {
+      let h = `<div class="dh"><div class="big mon">${img(monArt(m.id))}</div><div>
+        <h1>${m.boss ? '👑 ' : ''}${esc(m.name)}</h1>
+        <div class="sub">#${m.id} · Lv.${m.level}</div>
+        <div class="tags">${elTag(m.element, m.elementLevel)}<span class="tag">เผ่า ${esc(RACE[m.race]||m.race)}</span><span class="tag">ขนาด ${esc(SIZE[m.size]||m.size)}</span>
+        ${m.star ? `<span class="tag star">★ มอนดาว</span>` : ''}${m.boss ? `<span class="tag star">บอส</span>` : ''}</div></div></div>`;
+      if (m.star) h += `<section><h2>★ มอนดาว</h2><p>เลือด x${m.star.hpMultiplier} (ปกติ ${num(m.star.baseHp)}) · ลดดาเมจที่ได้รับ ${m.star.reduction}% · ดูดเลือดผู้เล่นในแผนที่ดาวได้ไม่เกิน ${m.star.drainCap}% ของ Max HP ต่อวินาที</p></section>`;
+      h += weaknessTable(m);
+      const st = m.stats || {};
+      h += `<section><h2>ค่าสถานะ</h2><div class="kv">
+        <div><span>HP</span><b>${num(m.hp)}</b></div><div><span>EXP</span><b>${num(m.exp)}</b></div><div><span>Job EXP</span><b>${num(m.jobExp)}</b></div>
+        <div><span>ATK</span><b>${num(m.atk)}–${num(m.atkMax)}</b></div><div><span>MATK</span><b>${num(m.matk)}–${num(m.matkMax)}</b></div>
+        <div><span>ตีด้วย</span><b>${m.magicAttack ? 'เวท' : 'กายภาพ'}</b></div>
+        <div><span>DEF</span><b>${m.def}</b></div><div><span>MDEF</span><b>${m.mdef}</b></div><div><span>HIT</span><b>${m.hit}</b></div><div><span>FLEE</span><b>${m.flee}</b></div>
+        <div><span>ระยะโจมตี</span><b>${m.attackRangeTiles} ช่อง</b></div><div><span>หน่วงการโจมตี</span><b>${m.attackDelayMs} ms</b></div>
+        <div><span>ความเร็วเดิน</span><b>${m.walkSpeed}</b></div><div><span>ระยะไล่</span><b>${m.chaseRangeTiles} ช่อง</b></div>
+        ${m.penetration ? `<div><span>เจาะเกราะ</span><b>${m.penetration}%</b></div>` : ''}${m.blockPierce ? `<div><span>ทะลวงบล็อก</span><b>${m.blockPierce}</b></div>` : ''}
+        ${m.damageReduction ? `<div><span>ลดดาเมจ</span><b>${esc(typeof m.damageReduction === 'object' ? JSON.stringify(m.damageReduction) : m.damageReduction)}</b></div>` : ''}
+        ${Object.entries(st).map(([k,v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}
+      </div></section>`;
+      if (m.skills?.length) h += `<section><h2>สกิล</h2><div class="tw"><table><tr><th>สกิล</th><th>ประเภท</th><th>ธาตุ</th><th class="num">ระยะ</th><th class="num">ดาเมจ</th><th class="num">ร่าย / คูลดาวน์</th></tr>${m.skills.map(s => `<tr><td>${esc(s.name)}</td><td>${s.kind === 'magic' ? 'เวท' : esc(s.kind)}${s.area ? ` <span class="note">${esc(s.area)}${s.radiusTiles ? ` r${s.radiusTiles}` : ''}</span>` : ''}</td><td>${s.element ? elTag(s.element) : ''}</td><td class="num">${s.rangeTiles ?? ''}</td><td class="num">${s.hitPercent ?? ''}%${s.hits > 1 ? ` ×${s.hits}` : ''}</td><td class="num">${(s.castMs||0)/1000} / ${(s.cooldownMs||0)/1000} วิ</td></tr>`).join('')}</table></div></section>`;
+      const sp = new Map(); for (const s of m.spawns||[]) { const x = sp.get(s.mapId) || {count:0, fixed:false}; x.count += s.count||0; x.fixed ||= s.fixed; sp.set(s.mapId, x); }
+      if (sp.size) h += `<section><h2>พบที่</h2><ul class="plain">${[...sp].map(([id,x]) => `<li>${mapLink(id)} <span class="note">${x.fixed ? 'จุดตายตัว' : ''} ${x.count} ตัว</span></li>`).join('')}</ul></section>`;
+      if (m.drops?.length) h += `<section><h2>ของดรอป</h2><div class="tw"><table><tr><th>ไอเทม</th><th class="num">โอกาส</th><th class="num">จำนวน</th></tr>${[...m.drops].sort((a,b)=>b.chance-a.chance).map(d => `<tr><td>${itemLink(d.itemId)}</td><td class="num">${pct(d.chance)}</td><td class="num">${d.min === d.max ? '×' + d.min : `×${d.min}-${d.max}`}</td></tr>`).join('')}</table></div></section>`;
+      return h;
+    },
+  },
+  maps: {
+    label:'แผนที่',
+    all: MAPS,
+    filters: st => `<input type="search" data-k="q" placeholder="ค้นหาแผนที่ หรือชื่อมอน" value="${esc(st.q)}">
+      <label><input type="checkbox" data-k="star"${st.star?' checked':''}> ★ แผนที่ดาว</label>
+      <label><input type="checkbox" data-k="boss"${st.boss?' checked':''}> มีบอส</label>`,
+    match: (m, st) => (!st.star || m.star) && (!st.boss || m.boss),
+    text: m => `${m.name} ${m.id} ${m.list.map(x=>x.m.name).join(' ')}`,
+    row: m => ({ic: m.list[0] ? img(monArt(m.list[0].m.id)) : '', name: `${m.star ? '<span style="color:var(--accent)">★</span> ' : ''}${esc(m.name)}`,
+      sub: `${m.list.length} ชนิด · ${[...new Set(m.list.map(x=>EL[x.m.element]))].join(' ')}`, right: m.min === m.max ? `Lv.${m.min}` : `Lv.${m.min}–${m.max}`}),
+    get: id => mapById.get(id),
+    detail: mp => {
+      let h = `<div class="dh"><div><h1>${mp.star ? '★ ' : ''}${esc(mp.name)}</h1>
+        <div class="sub">มอนเลเวล ${mp.min === mp.max ? mp.min : `${mp.min}–${mp.max}`} · ${mp.list.length} ชนิด</div>
+        <div class="tags">${mp.star ? `<span class="tag star">★ แผนที่ดาว</span>` : ''}${mp.boss ? `<span class="tag star">มีบอส</span>` : ''}</div></div></div>`;
+      if (mp.star) h += `<section><p>แผนที่มีดาว: มอนทั่วไปเป็นมอนดาว เลือดมากขึ้นและลดดาเมจที่ได้รับ บอสไม่เปลี่ยน</p></section>`;
+      h += `<section><h2>มอนสเตอร์ในแผนที่</h2><div class="tw"><table><tr><th>มอนสเตอร์</th><th class="num">Lv</th><th class="num">HP</th><th class="num">EXP</th><th>ธาตุ</th><th>เผ่า</th><th>ขนาด</th><th>ตี</th></tr>${mp.list.map(({m, count}) => `<tr><td>${m.star ? '★ ' : ''}${m.boss ? '👑 ' : ''}<a class="mini" href="#monsters/${m.id}">${img(monArt(m.id))}${esc(m.name)}</a></td><td class="num">${m.level}</td><td class="num">${num(m.hp)}</td><td class="num">${num(m.exp)}</td><td>${elTag(m.element, m.elementLevel)}</td><td>${esc(RACE[m.race]||m.race)}</td><td>${esc(SIZE[m.size]||m.size)}</td><td>${m.magicAttack ? 'เวท' : 'กายภาพ'} <span class="note">${m.attackRangeTiles} ช่อง</span></td></tr>`).join('')}</table></div></section>`;
+      h += pickSection(mp) + `<section><h2>ใช้ธาตุไหนฟาร์มดี</h2>
+          <p class="note">ตัวคูณดาเมจต่อมอนที่เลือกไว้ · "เฉลี่ย" คิดถ่วงตาม HP สมมติว่ามอนทุกชนิดเกิดเท่ากัน · มี x0 = มีตัวที่ตีไม่เข้า</p>
+          <div id="el-out"></div></section>`;
+      h += calcSection() + defSection();
+      return h;
+    },
+  },
+  skills: {
+    label:'สกิล',
+    all: SB.skills,
+    filters: st => `<input type="search" data-k="q" placeholder="ค้นหาสกิล (ไทย/อังกฤษ)" value="${esc(st.q)}">
+      <select data-k="cls">${opts(Object.fromEntries(SB.classes.map(c => [c.id, `${c.name} · ${c.thai||''}`])), 'ทุกอาชีพ', st.cls)}</select>
+      <select data-k="kind">${opts({active:'กดใช้',passive:'ติดตัว',toggle:'เปิด/ปิด'}, 'ทุกประเภท', st.kind)}</select>`,
+    match: (s, st) => (!st.cls || s.classId === st.cls) && (!st.kind || s.kind === st.kind),
+    text: s => `${s.name} ${s.thai} ${s.id} ${className.get(s.classId)||''}`,
+    row: s => ({ic: img(skillIcon(s.id)), name: esc(s.name), sub: `${esc(s.thai||'')} · ${esc(className.get(s.classId)||s.classId)}`, right: `Lv.${s.maxLevel}`}),
+    get: id => SB.skills.find(s => s.id === id),
+    detail: s => {
+      let h = `<div class="dh"><div class="big">${img(skillIcon(s.id))}</div><div><h1>${esc(s.name)}</h1>
+        <div class="sub">${esc(s.thai||'')} · ${esc(className.get(s.classId)||s.classId)} (${esc(classThai.get(s.classId)||'')}) · สูงสุด Lv.${s.maxLevel}</div></div></div>`;
+      if (s.description) h += `<section><p>${esc(s.description)}</p></section>`;
+      if (s.facts?.length) h += `<section><h2>ข้อมูล</h2><ul class="plain">${s.facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul></section>`;
+      if (s.rows?.length) {
+        const n = Math.max(...s.rows.map(r => r.values.length));
+        h += `<section><h2>ค่าตามเลเวล</h2><div class="tw"><table><tr><th>เลเวล</th>${Array.from({length:n}, (_,i) => `<th class="num">${i+1}</th>`).join('')}</tr>${s.rows.map(r => `<tr><td>${esc(r.label)}</td>${r.values.map(v => `<td class="num">${esc(v)}</td>`).join('')}</tr>`).join('')}</table></div></section>`;
+      }
+      if (s.notes?.length) h += `<section><h2>หมายเหตุ</h2><ul class="plain">${s.notes.map(f => `<li>${esc(f)}</li>`).join('')}</ul></section>`;
+      return h;
+    },
+  },
+  stones: {
+    label:'ศิลาปลุกพลัง',
+    all: DATA.stones.list,
+    filters: st => `<input type="search" data-k="q" placeholder="ค้นหาศิลา หรือผล" value="${esc(st.q)}">`,
+    match: () => true,
+    text: s => `${s.thai} ${s.name||''} ${s.id} ${s.effect||''}`,
+    row: s => ({ic:'', name: esc(s.thai), sub: esc(s.name || s.id), right: esc(s.role || '')}),
+    get: id => DATA.stones.list.find(s => s.id === id),
+    detail: s => {
+      let h = `<div class="dh"><div><h1>${esc(s.thai)}</h1><div class="sub">${esc(s.name||'')} · ${esc(s.id)}${s.role ? ' · ' + esc(s.role) : ''}</div></div></div>`;
+      if (s.effect) h += `<section><p>${esc(s.effect)}</p></section>`;
+      if (s.tiers?.length) h += `<section><h2>ระดับ</h2><div class="tw"><table><tr><th>ระดับ</th><th>ผล</th></tr>${s.tiers.map(t => `<tr><td class="r-${t.tier}">${esc(RARITY[t.tier]||t.tier)}</td><td>${esc(t.text)}</td></tr>`).join('')}</table></div></section>`;
+      if (s.requires) h += `<section><h2>ใช้กับ</h2>${generic(s.requires)}</section>`;
+      if (s.conditions?.length) h += `<section><h2>เงื่อนไข</h2><ul class="plain">${s.conditions.map(c => `<li>${esc(c)}</li>`).join('')}</ul></section>`;
+      return h;
+    },
+  },
+  elements: {
+    label:'ตารางธาตุ',
+    all: DATA.elements.list,
+    filters: () => `<p class="note" style="margin:0">เลือกธาตุที่ใช้ตี เพื่อดูตัวคูณกับมอนแต่ละธาตุ/เลเวลธาตุ</p>`,
+    match: () => true,
+    text: e => `${e.thai} ${e.name}`,
+    row: e => ({ic: `<span class="el" style="background:${e.color}">&nbsp;</span>`, name: esc(e.thai), sub: esc(e.name), right: ''}),
+    get: id => DATA.elements.list.find(e => e.id === id),
+    detail: e => {
+      const head = `<tr><th>ธาตุมอน</th><th class="num">Lv.1</th><th class="num">Lv.2</th><th class="num">Lv.3</th><th class="num">Lv.4</th></tr>`;
+      let h = `<div class="dh"><div><h1>ธาตุ${esc(e.thai)}</h1><div class="sub">${esc(e.name)}</div></div></div>`;
+      h += `<section><h2>ตีด้วย${esc(e.thai)} ใส่มอนธาตุต่าง ๆ</h2><div class="tw"><table>${head}${ELS.map(d => `<tr><td>${elTag(d)}</td>${[1,2,3,4].map(l => `<td class="num">${mulChip(mult(e.id, d, l))}</td>`).join('')}</tr>`).join('')}</table></div></section>`;
+      h += `<section><h2>มอนธาตุ${esc(e.thai)} โดนธาตุอื่นตี</h2><div class="tw"><table><tr><th>ธาตุที่ใช้ตี</th><th class="num">Lv.1</th><th class="num">Lv.2</th><th class="num">Lv.3</th><th class="num">Lv.4</th></tr>${ELS.map(a => `<tr><td>${elTag(a)}</td>${[1,2,3,4].map(l => `<td class="num">${mulChip(mult(a, e.id, l))}</td>`).join('')}</tr>`).join('')}</table></div></section>`;
+      return h;
+    },
+  },
+};
+const ORDER = ['items','cards','monsters','maps','skills','stones','elements'];
+const idOf = x => String(x.id);
+
+/* ---------- state + rendering ---------- */
+const state = Object.fromEntries(ORDER.map(k => [k, {q:'', sel:null, scroll:0}]));
+let cur = null, filtered = [];
+
+$('#nav').innerHTML = ORDER.map(k => `<a href="#${k}" data-cat="${k}">${CATS[k].label}<span class="n">${CATS[k].all.length}</span></a>`).join('');
+if (DATA.generatedAt) $('#meta').textContent = 'ข้อมูล ' + new Date(DATA.generatedAt).toLocaleDateString('th-TH', {day:'numeric', month:'short', year:'numeric'});
+
+function applyFilter(){
+  const C = CATS[cur], st = state[cur];
+  const q = (st.q || '').trim().toLowerCase();
+  const terms = q ? q.split(/\s+/) : [];
+  filtered = C.all.filter(x => C.match(x, st) && (!terms.length || (t => terms.every(w => t.includes(w)))(C.text(x).toLowerCase())));
+  $('#count').textContent = `${filtered.length.toLocaleString()} รายการ`;
+  $('#list').innerHTML = filtered.length ? filtered.map(x => {
+    const r = C.row(x), id = idOf(x);
+    return `<a class="row${id === st.sel ? ' sel' : ''}" href="#${cur}/${encodeURIComponent(id)}" data-id="${esc(id)}"><span class="ic">${r.ic}</span><span class="t"><b>${r.name}</b>${r.sub ? `<small>${r.sub}</small>` : ''}</span><span class="r">${r.right}</span></a>`;
+  }).join('') : `<div class="empty">ไม่พบรายการ</div>`;
+}
+function showCategory(cat){
+  if (cur === cat) return;
+  if (cur) state[cur].scroll = $('#list').scrollTop;
+  cur = cat;
+  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.cat === cat));
+  $('#filters').innerHTML = CATS[cat].filters(state[cat]);
+  applyFilter();
+  $('#list').scrollTop = state[cat].scroll;
+}
+function showDetail(id){
+  const C = CATS[cur], st = state[cur];
+  st.sel = id;
+  document.querySelectorAll('#list .row.sel').forEach(r => r.classList.remove('sel'));
+  const row = id && [...document.querySelectorAll('#list .row')].find(r => r.dataset.id === id);
+  if (row) {
+    row.classList.add('sel');
+    const L = $('#list'), rt = row.offsetTop - L.offsetTop;
+    if (rt < L.scrollTop || rt + row.offsetHeight > L.scrollTop + L.clientHeight) L.scrollTop = rt - L.clientHeight / 3;
+  }
+  const x = id && C.get(id);
+  $('#detail').innerHTML = x ? C.detail(x) : `<div class="empty">เลือกรายการจากด้านซ้ายเพื่อดูรายละเอียด</div>`;
+  if (x && cur === 'maps') runMap(x);
+  $('#detail').scrollTop = 0;
+  document.title = x ? `${(x.name || x.thai || id)} · Aetheria Wiki` : `${C.label} · Aetheria Wiki`;
+}
+function route(){
+  const [cat, rawId] = location.hash.slice(1).split('/');
+  const c = CATS[cat] ? cat : 'maps';
+  showCategory(c);
+  showDetail(rawId ? decodeURIComponent(rawId) : state[c].sel);
+}
+window.addEventListener('hashchange', route);
+
+let t;
+$('#filters').addEventListener('input', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  state[cur][k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+  clearTimeout(t); t = setTimeout(() => { applyFilter(); $('#list').scrollTop = 0; showDetail(state[cur].sel); }, e.target.type === 'search' ? 150 : 0);
+});
+const curMap = () => cur === 'maps' && state.maps.sel ? mapById.get(state.maps.sel) : null;
+$('#detail').addEventListener('input', e => {
+  const d = e.target.dataset, mp = curMap(); if (!mp) return;
+  if (d.pick) {
+    const id = +d.pick, ids = pickedIds(mp);
+    calc.pick[mp.id] = e.target.checked ? [...new Set([...ids, id])] : ids.filter(x => x !== id);
+    saveCalc(); runMap(mp); return;
+  }
+  if (d.ccMode !== undefined) {
+    calc.mode = d.ccMode; saveCalc();
+    $('#cc').outerHTML = calcSection(); runCalc(mp); return;
+  }
+  if (d.ccBase !== undefined) calc.base[calc.mode] = +e.target.value || 0;
+  else if (d.ccMes !== undefined) calc.magicElSize = e.target.checked;
+  else if (d.cc) calc[d.cc] = +e.target.value || 0;
+  else if (d.ccEl) {
+    calc.els = ELS.filter(x => x === d.ccEl ? e.target.checked : calc.els.includes(x));
+    e.target.parentElement.classList.toggle('on', e.target.checked);
+  } else if (d.cd) { calc.def[d.cd] = d.cd === 'normEl' ? e.target.value : +e.target.value || 0; saveCalc(); runDef(mp); return; }
+  else if (d.cdSlot) { calc.def.slots[d.cdSlot] = e.target.checked; saveCalc(); runDef(mp); return; }
+  else return;
+  saveCalc(); runCalc(mp);
+});
+$('#detail').addEventListener('click', e => {
+  const pa = e.target.closest('[data-pick-all]'), mp0 = curMap();
+  if (pa && mp0) {
+    const mode = pa.dataset.pickAll;
+    calc.pick[mp0.id] = mode === 'none' ? [] : mode === 'noboss' ? mp0.list.filter(x => !x.m.boss).map(x => x.m.id) : mp0.list.map(x => x.m.id);
+    document.querySelectorAll('[data-pick]').forEach(c => c.checked = calc.pick[mp0.id].includes(+c.dataset.pick));
+    saveCalc(); runMap(mp0); return;
+  }
+  const b = e.target.closest('[data-cc-ex],[data-cc-in]'), mp = curMap(); if (!b || !mp) return;
+  if (b.dataset.ccEx) calc.excl = [...new Set([...calc.excl, +b.dataset.ccEx])];
+  else calc.excl = calc.excl.filter(id => id !== +b.dataset.ccIn);
+  saveCalc(); runCalc(mp); runDef(mp);
+});
+$('#list').addEventListener('keydown', e => {
+  if (!['ArrowDown','ArrowUp'].includes(e.key) || !filtered.length) return;
+  e.preventDefault();
+  const i = filtered.findIndex(x => idOf(x) === state[cur].sel);
+  const n = Math.max(0, Math.min(filtered.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+  history.replaceState(null, '', `#${cur}/${encodeURIComponent(idOf(filtered[n]))}`); route();
+});
+$('#theme').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('aw-theme', document.documentElement.dataset.theme); } catch {}
+});
+try { const th = localStorage.getItem('aw-theme'); if (th) document.documentElement.dataset.theme = th; } catch {}
+route();
+</script>
+</body>
+</html>
