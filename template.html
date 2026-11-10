@@ -705,6 +705,7 @@ const CATS = {
         const n = Math.max(...s.rows.map(r => r.values.length));
         h += `<section><h2>ค่าตามเลเวล</h2><div class="tw"><table><tr><th>เลเวล</th>${Array.from({length:n}, (_,i) => `<th class="num">${i+1}</th>`).join('')}</tr>${s.rows.map(r => `<tr><td>${esc(r.label)}</td>${r.values.map(v => `<td class="num">${esc(v)}</td>`).join('')}</tr>`).join('')}</table></div></section>`;
       }
+      if (simById.has(s.id)) h = h.replace('</h1>', ` <a class="tag" data-nav href="#sim/${s.id}">จำลองดาเมจ + ศิลา →</a></h1>`);
       if (s.notes?.length) h += `<section><h2>หมายเหตุ</h2><ul class="plain">${s.notes.map(f => `<li>${esc(f)}</li>`).join('')}</ul></section>`;
       return h;
     },
@@ -743,7 +744,8 @@ const CATS = {
     },
   },
 };
-const ORDER = ['items','cards','monsters','maps','skills','stones','elements'];
+/*__SIM__*/
+const ORDER = ['items','cards','monsters','maps','skills','stones','elements','sim'];
 const idOf = x => String(x.id);
 
 /* ---------- state + rendering ---------- */
@@ -786,6 +788,7 @@ function showDetail(id){
   const x = id && C.get(id);
   $('#detail').innerHTML = x ? C.detail(x) : `<div class="empty">เลือกรายการจากด้านซ้ายเพื่อดูรายละเอียด</div>`;
   if (x && cur === 'maps') runMap(x);
+  if (x && cur === 'sim') runSim(x);
   $('#detail').scrollTop = 0;
   document.title = x ? `${(x.name || x.thai || id)} · Aetheria Wiki` : `${C.label} · Aetheria Wiki`;
 }
@@ -918,6 +921,33 @@ $('#detail').addEventListener('keydown', e => {
   if (e.key !== 'Enter' || e.target.id !== 'ex-q') return;
   const mp = curMap(); if (!mp) return;
   e.preventDefault(); addExcl(); saveCalc(); runExcl(); runCalc(mp); runDef(mp);
+});
+/* simulator controls: re-render the simulator on every change, keep the scroll position */
+const curSim = () => cur === 'sim' && state.sim.sel ? simById.get(state.sim.sel) : null;
+function rerenderSim(info){ const d = $('#detail'), y = d.scrollTop; d.innerHTML = simDetail(info); runSim(info); d.scrollTop = y; }
+$('#detail').addEventListener('change', e => {
+  const info = curSim(); if (!info) return;
+  const d = e.target.dataset, st = simState(info.s.id);
+  if (d.sim) calc.sim[d.sim] = e.target.type === 'checkbox' ? e.target.checked : (e.target.tagName === 'SELECT' && d.sim === 'roll' || d.sim === 'searchTier' ? e.target.value : +e.target.value);
+  else if (d.simLv !== undefined) st.lv = +e.target.value;
+  else if (d.simReal !== undefined) st.real = +e.target.value || 0;
+  else if (d.simTag) { const t = simTags(info); e.target.checked ? t.add(d.simTag) : t.delete(d.simTag); st.tags = [...t]; }
+  else if (d.simStone !== undefined || d.simTier !== undefined || d.simSlv !== undefined) {
+    const i = +(d.simStone ?? d.simTier ?? d.simSlv); st.stones = st.stones || [];
+    const x = st.stones[i] = st.stones[i] || {tier:'legendary', lv:1};
+    if (d.simStone !== undefined) x.id = e.target.value || null;
+    if (d.simTier !== undefined) x.tier = e.target.value;
+    if (d.simSlv !== undefined) x.lv = +e.target.value;
+  } else return;
+  saveCalc(); rerenderSim(info);
+});
+$('#detail').addEventListener('click', e => {
+  const info = curSim(); if (!info) return;
+  const st = simState(info.s.id);
+  const u = e.target.closest('[data-sim-use]');
+  if (u) { const c = (window.__simBest || [])[+u.dataset.simUse]; if (!c) return;
+    st.stones = c.picks.map(p => ({id:p.st.id, tier:p.tier, lv:p.lv})); saveCalc(); rerenderSim(info); $('#detail').scrollTop = 0; return; }
+  if (e.target.closest('[data-sim-tagreset]')) { st.tags = null; saveCalc(); rerenderSim(info); }
 });
 $('#list').addEventListener('keydown', e => {
   if (!['ArrowDown','ArrowUp'].includes(e.key) || !filtered.length) return;

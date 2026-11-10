@@ -45,12 +45,14 @@ def build():
         "elements": wiki["elements"],
         "maps": wiki["maps"],
         "skillBook": wiki["skillBook"],
-        "stones": {"list": wiki["stones"].get("list", [])},
+        "stones": {k: wiki["stones"].get(k) for k in ("list", "unlock", "level")},
         "icons": {"items": icons.get("items", {}), "skills": icons.get("skills", {})},
         "monsterArt": {k: v.get("file") for k, v in art.items() if isinstance(v, dict)},
     }
     blob = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-    html = (HERE / "template.html").read_text(encoding="utf-8").replace("/*__DATA__*/null", blob)
+    html = (HERE / "template.html").read_text(encoding="utf-8")
+    html = html.replace("/*__SIM__*/", (HERE / "sim.js").read_text(encoding="utf-8"))
+    html = html.replace("/*__DATA__*/null", blob)
     (HERE / "index.html").write_text(html, encoding="utf-8")
     print(f"wrote index.html ({len(html) / 1e6:.1f} MB)")
 
