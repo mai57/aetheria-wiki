@@ -304,7 +304,42 @@ function runElem(mp){
     ${rows.map((r,i) => `<tr class="${i === 0 && !r.zero ? 'best' : ''}"><td>${elTag(r.a)}</td>${r.xs.map(x => `<td class="num">${mulChip(x)}</td>`).join('')}<td class="num">${r.zero ? '<span class="note">มีตัวตีไม่เข้า</span>' : '<b>x' + r.eff.toFixed(2) + '</b>'}</td></tr>`).join('')}
     </table></div>`;
 }
-const runMap = mp => { runElem(mp); runCalc(mp); runDef(mp); };
+/* ---------- cards you don't have / can't buy (shared by both card calculators, all maps) ---------- */
+const isBossCard = c => (c.droppedBy || []).length > 0 && c.droppedBy.every(d => monById.get(String(d.monsterId))?.boss);
+const cardOff = c => calc.excl.includes(c.id) || (calc.noBoss && isBossCard(c));
+// built lazily: defVec() depends on constants declared further down
+let _calcCards = null;
+const calcCards = () => _calcCards ??= DATA.items.filter(i => i.type === 'Card' && i.droppedBy?.length && (cardBonus(i) || defVec(i)))
+  .sort((a, b) => a.name.localeCompare(b.name));
+const cardName = c => c.name.replace(/ Card$/, '');
+function exclSection(){
+  return `<section id="ex"><h2>การ์ดที่ไม่ใช้</h2>
+    <p class="note">การ์ดที่ไม่มี แพงเกินไป หรือซื้อไม่ได้ — ตัวคำนวณการ์ดอาวุธและการ์ดป้องกันจะไม่เลือกการ์ดเหล่านี้ (ใช้กับทุกแผนที่)</p>
+    <div class="cc-ctl">
+      <label><input type="checkbox" data-ex-boss${calc.noBoss ? ' checked' : ''}> ไม่ใช้การ์ดบอส 👑 (${calcCards().filter(isBossCard).length} ใบ)</label>
+    </div>
+    <div class="cc-ctl">
+      <input id="ex-q" list="ex-list" placeholder="พิมพ์ชื่อการ์ดที่จะเอาออก" style="flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit">
+      <datalist id="ex-list">${calcCards().map(c => `<option value="${esc(cardName(c))}">`).join('')}</datalist>
+      <button class="chipbtn" data-ex-add>เอาออก</button>
+      <button class="chipbtn" data-ex-clear>ล้างทั้งหมด</button>
+    </div>
+    <div id="ex-out"></div></section>`;
+}
+function runExcl(){
+  const out = $('#ex-out'); if (!out) return;
+  const bossOff = calc.noBoss ? calcCards().filter(isBossCard) : [];
+  out.innerHTML = (calc.excl.length ? `<div class="note">เอาออกเอง (กด ↺ เพื่อเอากลับมา):</div><div>${calc.excl.map(id => { const c = itemById.get(String(id)); return `<button class="chipbtn" data-cc-in="${id}">${c && isBossCard(c) ? '👑 ' : ''}${esc(c ? cardName(c) : id)} ↺</button>`; }).join('')}</div>` : '<div class="note">ยังไม่ได้เอาการ์ดใบไหนออกเอง — กด ✕ ข้างการ์ดในตารางผล หรือพิมพ์ชื่อด้านบน</div>')
+    + (bossOff.length ? `<div class="note" style="margin-top:6px">การ์ดบอสที่ไม่ใช้: ${bossOff.map(c => esc(cardName(c))).join(', ')}</div>` : '');
+}
+function addExcl(){
+  const q = ($('#ex-q')?.value || '').trim().toLowerCase().replace(/ card$/, ''); if (!q) return;
+  const c = calcCards().find(x => cardName(x).toLowerCase() === q) || calcCards().find(x => cardName(x).toLowerCase().includes(q));
+  if (!c) { $('#ex-q').setCustomValidity('ไม่พบการ์ดนี้'); $('#ex-q').reportValidity(); return; }
+  $('#ex-q').setCustomValidity(''); $('#ex-q').value = '';
+  calc.excl = [...new Set([...calc.excl, c.id])];
+}
+const runMap = mp => { runElem(mp); runExcl(); runCalc(mp); runDef(mp); };
 
 function calcSection(){
   const M = MODES[calc.mode] || MODES.melee;
@@ -323,16 +358,15 @@ function calcSection(){
     </div>
     <div class="note" style="margin-bottom:4px">ธาตุที่ตีได้ (กดเพื่อเปิด/ปิด) — ${M.hint}</div>
     <div class="cc-els">${ELS.map(e => `<label class="${calc.els.includes(e) ? 'on' : ''}"><input type="checkbox" data-cc-el="${e}"${calc.els.includes(e) ? ' checked' : ''}>${elTag(e)}</label>`).join('')}</div>
-    <div id="cc-excl"></div><div id="cc-out"></div>
+    <div id="cc-out"></div>
     <p class="note" style="margin-top:10px">${magicNote}สูตรที่ใช้: การ์ดประเภทเดียวกันบวกกัน ต่างประเภท (ธาตุ / เผ่า / ขนาด / ${M.pct} %) คูณกัน แบบ RO — ยังไม่ได้ยืนยันกับเกมนี้ ·
     ${M.pct} % ของการ์ดบวกรวมกับค่าที่มีอยู่แล้ว · ถือว่ามอนทุกชนิดเกิดเท่ากัน ถ่วงตาม HP · ไม่รวมการ์ดที่เพิ่ม ATK/MATK ตัวเลขตายตัว การ์ดที่มีผลเฉพาะสกิล และการ์ดที่ไม่มีแหล่งดรอป</p></section>`;
 }
 function runCalc(mp){
   const out = $('#cc-out'); if (!out) return;
   const use = pickedMons(mp);
-  if (!use.length) { out.innerHTML = `<p class="empty">เลือกมอนอย่างน้อย 1 ตัว</p>`; $('#cc-excl').innerHTML = ''; return; }
-  const relevant = WCARDS.filter(x => !calc.excl.includes(x.c.id) && cardUseful(x.b, use));
-  $('#cc-excl').innerHTML = calc.excl.length ? `<div class="note">ไม่ใช้การ์ด (กดเพื่อเอากลับมา): ${calc.excl.map(id => `<button class="chipbtn" data-cc-in="${id}">${esc((itemById.get(String(id))?.name || id).replace(/ Card$/, ''))} ↺</button>`).join('')}</div>` : '';
+  if (!use.length) { out.innerHTML = `<p class="empty">เลือกมอนอย่างน้อย 1 ตัว</p>`; return; }
+  const relevant = WCARDS.filter(x => !cardOff(x.c) && cardUseful(x.b, use));
   if (!calc.els.length) { out.innerHTML = `<p class="empty">เลือกธาตุที่ตีได้อย่างน้อย 1 ธาตุ</p>`; return; }
   if (!relevant.length) { out.innerHTML = `<p class="empty">ไม่มีการ์ดอาวุธที่ช่วยสาย${esc(MODES[calc.mode].label)}กับมอนที่เลือก — เลือกธาตุให้เหมาะกับมอนแทน (ดูตาราง "ใช้ธาตุไหนฟาร์มดี")</p>`; return; }
   const base =Math.max(0, ...calc.els.map(a => evalCombo(use, a, []).eff));
@@ -344,7 +378,7 @@ function runCalc(mp){
   if (!top.length) { out.innerHTML = `<p class="empty">ไม่มีชุดที่ตีเข้าทุกตัวด้วยธาตุที่เลือก</p>`; return; }
   const cardCell = cb => {
     const cnt = new Map(); cb.forEach(x => cnt.set(x.c.id, (cnt.get(x.c.id) || 0) + 1));
-    return `<div class="cc-cards">${[...cnt].map(([id, n]) => `<span><a class="mini" href="#cards/${id}">${img(itemIcon(id))}${esc((itemById.get(String(id))?.name || id).replace(/ Card$/, ''))}</a>${n > 1 ? ` <b>×${n}</b>` : ''}<button class="x" title="ไม่มี/ซื้อไม่ได้ — ตัดการ์ดนี้ออก" data-cc-ex="${id}">✕</button></span>`).join('')}</div>`;
+    return `<div class="cc-cards">${[...cnt].map(([id, n]) => `<span><a class="mini" href="#cards/${id}">${img(itemIcon(id))}${isBossCard(itemById.get(String(id)) || {}) ? '👑 ' : ''}${esc((itemById.get(String(id))?.name || id).replace(/ Card$/, ''))}</a>${n > 1 ? ` <b>×${n}</b>` : ''}<button class="x" title="ไม่มี/ซื้อไม่ได้ — ตัดการ์ดนี้ออก" data-cc-ex="${id}">✕</button></span>`).join('')}</div>`;
   };
   out.innerHTML = `<div class="tw"><table><tr><th>#</th><th>การ์ด</th><th>ธาตุ</th>${use.map(m => `<th class="num">${esc(m.name)}</th>`).join('')}<th class="num">เฉลี่ย</th><th class="num">เทียบไม่ใส่การ์ด</th></tr>
     ${top.map((r, i) => `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td>${cardCell(r.cb)}</td><td>${elTag(r.atk)}</td>${r.xs.map(x => `<td class="num">${mulChip(x)}</td>`).join('')}<td class="num"><b>x${r.eff.toFixed(2)}</b></td><td class="num">${base ? `+${Math.round((r.eff / base - 1) * 100)}%` : '-'}</td></tr>`).join('')}
@@ -415,7 +449,7 @@ function runDef(mp){
   const pool = {}; for (const [s] of DSLOTS) pool[s] = [];
   const same = new Map(); // cards with identical defensive stats in the same slot are interchangeable: keep one, list the rest
   for (const x of DCARDS) {
-    const s = slotOf(x.c); if (!pool[s] || calc.excl.includes(x.c.id) || !useful(x.v)) continue;
+    const s = slotOf(x.c); if (!pool[s] || cardOff(x.c) || !useful(x.v)) continue;
     const key = s + '|' + Array.from(x.v).join(',');
     if (same.has(key)) same.get(key).alts.push(x.c); else { const e = {...x, alts:[]}; same.set(key, e); pool[s].push(e); }
   }
@@ -452,7 +486,7 @@ function runDef(mp){
   const table = ({top, base}) => !top.length ? `<p class="empty">ไม่มีการ์ดที่ช่วยในแผนที่นี้</p>` : `<div class="tw"><table><tr><th>#</th><th>การ์ด</th><th class="num">ดาเมจที่รับ</th><th class="num">Max HP</th><th class="num">ทนได้นานขึ้น</th></tr>
     ${top.map((r, i) => {
       const cards = r.pick.filter(Boolean);
-      const link = c => `<a class="mini" href="#cards/${c.id}">${img(itemIcon(c.id))}${esc(c.name.replace(/ Card$/, ''))}</a><button class="x" title="ไม่มี/ซื้อไม่ได้ — ตัดการ์ดนี้ออก" data-cc-ex="${c.id}">✕</button>`;
+      const link = c => `<a class="mini" href="#cards/${c.id}">${img(itemIcon(c.id))}${isBossCard(c) ? '👑 ' : ''}${esc(c.name.replace(/ Card$/, ''))}</a><button class="x" title="ไม่มี/ซื้อไม่ได้ — ตัดการ์ดนี้ออก" data-cc-ex="${c.id}">✕</button>`;
       return `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td><div class="cc-cards">${cards.length ? cards.map(p => `<span><span class="note">${DSLOTS.find(s => s[0] === p.s)[1]}:</span> ${[p.c, ...(p.alts || [])].map(link).join(' <span class="note">หรือ</span> ')}</span>`).join('') : '<span class="note">ไม่ใส่</span>'}</div></td>
         <td class="num">${r.dmg < base.dmg ? `<span class="mul g">−${Math.round((1 - r.dmg / base.dmg) * 100)}%</span>` : '<span class="mul n">0%</span>'}</td>
         <td class="num">${r.hpf > 1 ? `+${Math.round((r.hpf - 1) * 100)}%` : '-'}</td>
@@ -624,7 +658,7 @@ const CATS = {
       h += pickSection(mp) + `<section><h2>ใช้ธาตุไหนฟาร์มดี</h2>
           <p class="note">ตัวคูณดาเมจต่อมอนที่เลือกไว้ · "เฉลี่ย" คิดถ่วงตาม HP สมมติว่ามอนทุกชนิดเกิดเท่ากัน · มี x0 = มีตัวที่ตีไม่เข้า</p>
           <div id="el-out"></div></section>`;
-      h += calcSection() + defSection();
+      h += exclSection() + calcSection() + defSection();
       return h;
     },
   },
@@ -753,6 +787,7 @@ $('#detail').addEventListener('input', e => {
     calc.pick[mp.id] = e.target.checked ? [...new Set([...ids, id])] : ids.filter(x => x !== id);
     saveCalc(); runMap(mp); return;
   }
+  if (d.exBoss !== undefined) { calc.noBoss = e.target.checked; saveCalc(); runExcl(); runCalc(mp); runDef(mp); return; }
   if (d.ccMode !== undefined) {
     calc.mode = d.ccMode; saveCalc();
     $('#cc').outerHTML = calcSection(); runCalc(mp); return;
@@ -776,10 +811,20 @@ $('#detail').addEventListener('click', e => {
     document.querySelectorAll('[data-pick]').forEach(c => c.checked = calc.pick[mp0.id].includes(+c.dataset.pick));
     saveCalc(); runMap(mp0); return;
   }
+  const xb = e.target.closest('[data-ex-add],[data-ex-clear]');
+  if (xb && mp0) {
+    if (xb.dataset.exAdd !== undefined) addExcl(); else calc.excl = [];
+    saveCalc(); runExcl(); runCalc(mp0); runDef(mp0); return;
+  }
   const b = e.target.closest('[data-cc-ex],[data-cc-in]'), mp = curMap(); if (!b || !mp) return;
   if (b.dataset.ccEx) calc.excl = [...new Set([...calc.excl, +b.dataset.ccEx])];
   else calc.excl = calc.excl.filter(id => id !== +b.dataset.ccIn);
-  saveCalc(); runCalc(mp); runDef(mp);
+  saveCalc(); runExcl(); runCalc(mp); runDef(mp);
+});
+$('#detail').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.target.id !== 'ex-q') return;
+  const mp = curMap(); if (!mp) return;
+  e.preventDefault(); addExcl(); saveCalc(); runExcl(); runCalc(mp); runDef(mp);
 });
 $('#list').addEventListener('keydown', e => {
   if (!['ArrowDown','ArrowUp'].includes(e.key) || !filtered.length) return;
