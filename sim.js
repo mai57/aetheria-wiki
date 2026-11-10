@@ -61,7 +61,8 @@ function stoneNums(st, tier, lv, roll){
    post  = extra damage in "skill damage after the whole-skill stone" units, summed over all targets */
 const MODEL = {
   // whole-skill stones (one per skill)
-  multistrike: (X, T) => ({set:2 * X / 100, cdMul:1 + rng(/คูลดาวน์ \+(\d+)%/, T, 20) / 100, note:'สกิลออก 2 ครั้ง ครั้งละ X%'}),
+  // confirmed in game: total = normal cast + 2 repeats at X% each (×4.96 with X≈198)
+  multistrike: (X, T) => ({repeat:2, repeatX:X / 100, cdMul:1 + rng(/คูลดาวน์ \+(\d+)%/, T, 20) / 100, note:'ตีปกติ 1 รอบ + ตีซ้ำอีก 2 รอบ รอบละ X% (ยืนยันกับในเกมแล้ว)'}),
   ruthless: X => ({ruthless:X / 100, note:'ทุกครั้งที่ 3 ×X อื่น ๆ −5%'}),
   concentrate: X => ({plus:X / 100, note:'พื้นที่ −1 ช่อง (ไม่ได้คิดว่าโดนมอนน้อยลง)'}),
   aftershock: (X, T, e) => ({post:X / 100 * e.skillT}),
@@ -132,8 +133,9 @@ function simulate(info, lv, picks, env){
     const f = MODEL[p.st.id];
     effs.push({p, X, eff:f ? f(X, text, {...e0, lvScale:1 + PER_LV * (p.lv - 1) / 100}) : null});
   }
-  const agg = {plus:0, set:null, sep:1, cdMul:1, castMul:1, castAdd:0, delayMul:1, hitsAdd:0, directMul:1, jackpot:1, primary:0, neutral:false, trauma:0, combo:0, ruthless:0, arcane:0, hex:0};
+  const agg = {plus:0, set:null, sep:1, cdMul:1, castMul:1, castAdd:0, delayMul:1, hitsAdd:0, directMul:1, jackpot:1, primary:0, neutral:false, trauma:0, combo:0, ruthless:0, arcane:0, hex:0, repeat:0, repeatX:0};
   for (const {eff} of effs) if (eff) {
+    if (eff.repeat) { agg.repeat = eff.repeat; agg.repeatX = eff.repeatX; }
     for (const k of ['plus','hitsAdd','castAdd','primary','trauma','combo','ruthless','arcane','hex']) if (eff[k]) agg[k] += eff[k];
     for (const k of ['sep','cdMul','castMul','delayMul','directMul','jackpot']) if (eff[k]) agg[k] *= eff[k];
     if (eff.set != null) agg.set = eff.set;
@@ -151,12 +153,18 @@ function simulate(info, lv, picks, env){
   while (t < env.D - 1e-9) {
     casts++;
     if (t - lastHit > 4) stacks = 0;
-    let hs = 0;
-    for (let k = 1; k <= n; k++) {
-      let m = (agg.combo && k % 5 === 0) ? cmul + agg.combo : cf;
-      if (agg.trauma) { m *= 1 + stacks * agg.trauma; stacks = Math.min(10, stacks + 1); }
-      if (agg.ruthless) { dmgCount++; m *= dmgCount % 3 === 0 ? agg.ruthless : 0.95; }
-      hs += m;
+    // every hit of the cast in order: the normal round, then any repeat rounds (Multistrike);
+    // each hit can add a Trauma stack, count toward Combo's 5th hit and Ruthless' 3rd hit
+    let hs = 0, k = 0;
+    for (let round = 0; round <= agg.repeat; round++) {
+      const w = round === 0 ? 1 : agg.repeatX;
+      for (let j = 1; j <= n; j++) {
+        k++;
+        let m = (agg.combo && k % 5 === 0) ? cmul + agg.combo : cf;
+        if (agg.trauma) { m *= 1 + stacks * agg.trauma; stacks = Math.min(10, stacks + 1); }
+        if (agg.ruthless) { dmgCount++; m *= dmgCount % 3 === 0 ? agg.ruthless : 0.95; }
+        hs += m * w;
+      }
     }
     lastHit = t;
     const arc = agg.arcane && casts > 1 && cycle <= 5 ? agg.arcane : 0;
