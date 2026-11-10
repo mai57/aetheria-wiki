@@ -49,8 +49,9 @@ const simById = new Map(SIM_SKILLS.map(i => [i.s.id, i]));
 const fitsStone = (st, tags) => { const r = st.requires || {}; return (r.all || []).every(t => tags.has(t)) && (!r.any || r.any.some(t => tags.has(t))) && !(r.not || []).some(t => tags.has(t)); };
 
 // numbers of one stone at a tier / stone level / roll
-function stoneNums(st, tier, lv, roll){
+function stoneNums(st, tier, lv, roll, val){
   const t = st.tiers.find(x => x.tier === tier) || st.tiers[st.tiers.length - 1];
+  if (val > 0) return {X:val, raw:val, text:t.text, real:true};
   const [a, b] = t.main, base = roll === 'min' ? a : roll === 'max' ? b : (a + b) / 2;
   return {X: base * (1 + PER_LV * (lv - 1) / 100), raw: base, text: t.text};
 }
@@ -129,7 +130,7 @@ function simulate(info, lv, picks, env){
   const bleed = picks.some(p => p.st.id === 'impale');
   const e0 = {...env, bleed, lvScale, skillT:info.area ? env.N : 1};
   for (const p of picks) {
-    const {X, text} = stoneNums(p.st, p.tier, p.lv, env.roll);
+    const {X, text} = stoneNums(p.st, p.tier, p.lv, env.roll, p.val);
     const f = MODEL[p.st.id];
     effs.push({p, X, eff:f ? f(X, text, {...e0, lvScale:1 + PER_LV * (p.lv - 1) / 100}) : null});
   }
@@ -204,7 +205,7 @@ const simState = id => calc.sim.per[id] ||= {lv:null, stones:[], tags:null, real
 const simTags = info => new Set(simState(info.s.id).tags || [...info.guess]);
 const sockets = lv => UNLOCK.filter(u => lv >= u).length;
 const envOf = () => { const s = calc.sim; return {N:Math.max(1, +s.N || 1), D:Math.max(1, +s.D || 30), crit:+s.crit || 0, critDmg:+s.critDmg || 150, elMult:+s.elMult || 0, myHp:+s.myHp || 100, minI:Math.max(0.1, +s.minI || 0.5), bonus:+s.bonus || 0, party:!!s.party, frozen:!!s.frozen, near:!!s.near, roll:s.roll}; };
-const picksOf = (info, st) => (st.stones || []).slice(0, sockets(st.lv)).filter(x => x && stoneById.has(x.id)).map(x => ({st:stoneById.get(x.id), tier:x.tier || 'legendary', lv:x.lv || 1}));
+const picksOf = (info, st) => (st.stones || []).slice(0, sockets(st.lv)).filter(x => x && stoneById.has(x.id)).map(x => ({st:stoneById.get(x.id), tier:x.tier || 'legendary', lv:x.lv || 1, val:+x.val || 0}));
 
 function bestCombos(info, lv, tags, env){
   const k = sockets(lv); if (!k) return [];
@@ -262,7 +263,8 @@ function simDetail(info){
     ${k ? Array.from({length:k}, (_, i) => { const x = (st.stones || [])[i] || {}; return `<div class="cc-ctl"><b>ช่อง ${i + 1}</b>
       <select data-sim-stone="${i}" style="flex:1;min-width:200px">${stoneOpt(x.id)}</select>
       <select data-sim-tier="${i}">${TIERS.map(t => `<option value="${t}"${(x.tier || 'legendary') === t ? ' selected' : ''}>${RARITY[t]}</option>`).join('')}</select>
-      <label>เลเวล <select data-sim-slv="${i}">${Array.from({length:STONE_MAXLV}, (_, j) => `<option${(x.lv || 1) === j + 1 ? ' selected' : ''}>${j + 1}</option>`).join('')}</select></label></div>`; }).join('') : '<p class="empty">สกิลเลเวลนี้ยังไม่มีช่องศิลา</p>'}
+      <label>เลเวล <select data-sim-slv="${i}">${Array.from({length:STONE_MAXLV}, (_, j) => `<option${(x.lv || 1) === j + 1 ? ' selected' : ''}>${j + 1}</option>`).join('')}</select></label>
+      <label title="ตัวเลขหลักของศิลาก้อนที่มีจริงในเกม (ตัวเลขที่เป็น X ในคำอธิบาย) — ใส่แล้วจะใช้แทนค่าตามระดับ/เลเวล">ค่าจริง <input type="number" step="any" data-sim-sval="${i}" value="${x.val || ''}" placeholder="—" style="width:70px"></label></div>`; }).join('') : '<p class="empty">สกิลเลเวลนี้ยังไม่มีช่องศิลา</p>'}
     <div id="sim-stones"></div></section>
     <section><h2>ผลจำลอง</h2><div id="sim-out"></div></section>
     <section><h2>ชุดศิลาที่ดีที่สุดสำหรับสกิลนี้</h2>
@@ -280,8 +282,8 @@ function runSim(info){
   const scale = st.real > 0 ? st.real / r0.B0 : 0, unit = info.mag ? 'MATK' : 'ATK';
   const issues = checkPicks(info, tags, picks);
   const name = k => k === 'skill' ? 'ดาเมจสกิล' : (stoneById.has(k) ? stoneName(stoneById.get(k)) : k);
-  $('#sim-stones').innerHTML = picks.map(p => { const {X, text} = stoneNums(p.st, p.tier, p.lv, env.roll); const e = r.effs.find(x => x.p === p)?.eff;
-    return `<div class="note" style="margin-top:4px">${isWhole(p.st) ? '◆ ' : ''}<b>${esc(stoneName(p.st))}</b> ${esc(RARITY[p.tier])} Lv.${p.lv}: ${esc(text)} → ใช้ค่า <b>${+X.toFixed(1)}</b>${e?.note ? ` · ${esc(e.note)}` : ''}${!e ? ' · <span style="color:var(--warn)">ยังไม่คำนวณ</span>' : ''}</div>`; }).join('');
+  $('#sim-stones').innerHTML = picks.map(p => { const {X, text, real} = stoneNums(p.st, p.tier, p.lv, env.roll, p.val); const e = r.effs.find(x => x.p === p)?.eff;
+    return `<div class="note" style="margin-top:4px">${isWhole(p.st) ? '◆ ' : ''}<b>${esc(stoneName(p.st))}</b> ${esc(RARITY[p.tier])} Lv.${p.lv}: ${esc(text)} → ใช้ค่า <b>${+X.toFixed(1)}</b>${real ? ' (ค่าจริงที่ใส่เอง)' : ''}${e?.note ? ` · ${esc(e.note)}` : ''}${!e ? ' · <span style="color:var(--warn)">ยังไม่คำนวณ</span>' : ''}</div>`; }).join('');
   out.innerHTML = `${issues.length ? `<div class="mul w" style="display:block;text-align:left;padding:6px 10px;margin-bottom:8px">${issues.map(esc).join('<br>')}</div>` : ''}
     <div class="kv">
       <div><span>ดาเมจรวม ${env.D} วิ</span><b>${fmtD(r.total, scale)}</b></div>
