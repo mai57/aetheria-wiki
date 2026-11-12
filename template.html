@@ -722,6 +722,19 @@ const CATS = {
       let h = `<div class="dh"><div><h1>${esc(s.name || s.thai)}</h1><div class="sub">${esc(s.thai||'')} · ${esc(s.id)}${s.role ? ' · ' + esc(s.role) : ''}</div></div></div>`;
       if (s.effect) h += `<section><p>${esc(s.effect)}</p></section>`;
       if (s.tiers?.length) h += `<section><h2>ระดับ</h2><div class="tw"><table><tr><th>ระดับ</th><th>ผล</th></tr>${s.tiers.map(t => `<tr><td class="r-${t.tier}">${esc(RARITY[t.tier]||t.tier)}</td><td>${esc(t.text)}</td></tr>`).join('')}</table></div></section>`;
+      if (s.tiers?.length) {
+        const f = l => 1 + PER_LV * (l - 1) / 100, r1 = x => +x.toFixed(1);
+        h += `<section><h2>ค่าหลักตามเลเวลศิลา</h2>
+          <p class="note">ศิลาได้ EXP ตอนสกิลที่ใส่อยู่ฆ่ามอน · ค่าหลักเพิ่ม ${PER_LV}% ของค่าเดิมต่อเลเวล (Lv.${STONE_MAXLV} = +${PER_LV * (STONE_MAXLV - 1)}%) ตามข้อมูลวิกิทางการ · ตารางนี้ยังไม่รวมการตีบวก</p>
+          <div class="tw"><table><tr><th>เลเวล</th><th class="num">เพิ่ม</th>${s.tiers.map(t => `<th class="num r-${t.tier}">${esc(RARITY[t.tier] || t.tier)}</th>`).join('')}</tr>
+          ${Array.from({length:STONE_MAXLV}, (_, i) => i + 1).map(l => `<tr><td>Lv.${l}</td><td class="num">${l === 1 ? 'ค่าเดิม' : '+' + PER_LV * (l - 1) + '%'}</td>${s.tiers.map(t => `<td class="num">${r1(t.main[0] * f(l))}–${r1(t.main[1] * f(l))}</td>`).join('')}</tr>`).join('')}
+          </table></div>
+          <div class="cc-ctl" style="margin-top:12px"><span class="note">คำนวณจากศิลาของคุณ:</span>
+            <label>ค่าหลักตอนนี้ <input type="number" step="any" id="stc-v" style="width:80px"></label>
+            <label>ที่เลเวล <select id="stc-l">${Array.from({length:STONE_MAXLV}, (_, i) => `<option>${i + 1}</option>`).join('')}</select></label>
+            <span id="stc-out" class="note"></span></div>
+          <p class="note">ถ้าศิลาตีบวกมาแล้ว ค่าหลักที่ใส่ต้องเป็นค่าที่รวมตีบวกแล้ว (ตัวเลขใน tooltip) ผลจะเป็นค่าตอนเลเวลอื่นที่ระดับตีบวกเท่าเดิม — ถือว่าเลเวลคูณทับค่าที่ตีบวกแล้ว ซึ่งยังไม่ได้ยืนยัน</p></section>`;
+      }
       if (s.requires) h += `<section><h2>ใช้กับ</h2>${generic(s.requires)}</section>`;
       if (s.conditions?.length) h += `<section><h2>เงื่อนไข</h2><ul class="plain">${s.conditions.map(c => `<li>${esc(c)}</li>`).join('')}</ul></section>`;
       return h;
@@ -952,6 +965,14 @@ $('#detail').addEventListener('click', e => {
   if (u) { const c = (window.__simBest || [])[+u.dataset.simUse]; if (!c) return;
     st.stones = c.picks.map(p => ({id:p.st.id, tier:p.tier, lv:p.lv})); saveCalc(); rerenderSim(info); $('#detail').scrollTop = 0; return; }
   if (e.target.closest('[data-sim-tagreset]')) { st.tags = null; saveCalc(); rerenderSim(info); }
+});
+/* stone page: project the player's current main value to every stone level */
+$('#detail').addEventListener('input', e => {
+  if (!['stc-v', 'stc-l'].includes(e.target.id)) return;
+  const v = +$('#stc-v').value, l = +$('#stc-l').value, out = $('#stc-out');
+  if (!(v > 0)) { out.textContent = ''; return; }
+  const base = v / (1 + PER_LV * (l - 1) / 100);
+  out.innerHTML = Array.from({length:STONE_MAXLV}, (_, i) => i + 1).map(k => `Lv.${k}: <b>${(base * (1 + PER_LV * (k - 1) / 100)).toFixed(1)}</b>`).join(' · ');
 });
 $('#list').addEventListener('keydown', e => {
   if (!['ArrowDown','ArrowUp'].includes(e.key) || !filtered.length) return;
