@@ -741,7 +741,7 @@ const CATS = {
             <label>เพิ่มต่อขั้นตีบวก <input type="number" step="any" id="stc-s" placeholder="ไม่รู้ก็เว้นไว้" style="width:110px"></label>
             <span class="note">= ค่าขั้นถัดไป − ค่าขั้นนี้ ในรายการตีบวก (ที่เลเวลศิลาตอนนี้) · เว้นว่าง = ประมาณ 12.5% ของค่าสูงสุดของระดับ</span></div>
           <div id="stc-out"></div>
-          <p class="note">สูตร: ค่าหลัก = (ค่าสุ่ม + ขั้นตีบวก × ค่าเพิ่มต่อขั้น) × (1 + ${PER_LV}% × (เลเวล − 1)) — ตีบวกเพิ่มเท่ากันทุกขั้น และเลเวลคูณทับค่าที่ตีบวกแล้ว · ระดับธรรมดา: ตีบวกขั้นละ 12.5% ของค่าสูงสุดของระดับ (ตรงกับศิลาในเกม 4 ก้อน ทั้งสายดาเมจหลักและสายอื่น) · ระดับหายากขึ้นไปตีบวกได้น้อยกว่านี้และยังไม่รู้สูตร ควรใส่ "เพิ่มต่อขั้น" จากในเกม</p></section>`;
+          <p class="note">สูตร: ค่าหลัก = (ค่าสุ่ม + ขั้นตีบวก × ค่าเพิ่มต่อขั้น) × (1 + ${PER_LV}% × (เลเวล − 1)) — ตีบวกเพิ่มเท่ากันทุกขั้น และเลเวลคูณทับค่าที่ตีบวกแล้ว · ตีบวกขั้นละ % ของค่าสูงสุดของระดับ: ธรรมดา 12.5% (ยืนยันกับศิลา 4 ก้อน) · หายาก 5% (ยืนยันกับ Cooldown Recovery และ Brutality — แต่ Trauma ไม่ตรง) · มหากาพย์ ~2% (คาดจาก Multistrike) · ตำนาน ~0.8% (เดาตามรูปแบบ ยังไม่มีข้อมูล)</p></section>`;
       }
       if (s.requires) h += `<section><h2>ใช้กับ</h2>${generic(s.requires)}</section>`;
       if (s.conditions?.length) h += `<section><h2>เงื่อนไข</h2><ul class="plain">${s.conditions.map(c => `<li>${esc(c)}</li>`).join('')}</ul></section>`;
@@ -975,6 +975,13 @@ $('#detail').addEventListener('click', e => {
   if (e.target.closest('[data-sim-tagreset]')) { st.tags = null; saveCalc(); rerenderSim(info); }
 });
 /* stone page: main value at every stone level × refine step, from the player's own stone */
+// refine adds the same amount every step = k × the tier's max roll (at Lv.1), worked out from in-game refine ladders
+const REFINE_STEP = {
+  common:    {k:0.125, sure:true,  how:'ยืนยันกับศิลา 4 ก้อน'},
+  rare:      {k:0.05,  sure:true,  how:'ยืนยันกับ 2 ก้อน (Trauma ไม่ตรง)'},
+  epic:      {k:0.02,  sure:false, how:'คาดจาก Multistrike ก้อนเดียว'},
+  legendary: {k:0.008, sure:false, how:'เดาตามรูปแบบ ยังไม่มีข้อมูล'},
+};
 $('#detail').addEventListener('input', e => {
   if (!['stc-v', 'stc-l', 'stc-r', 'stc-t', 'stc-s'].includes(e.target.id)) return;
   const st = CATS.stones.get(state.stones.sel); if (!st) return;
@@ -982,12 +989,13 @@ $('#detail').addEventListener('input', e => {
   if (!(v > 0)) { out.innerHTML = ''; return; }
   const lf = l => 1 + PER_LV * (l - 1) / 100, tier = st.tiers.find(t => t.tier === $('#stc-t').value) || st.tiers[0];
   const typed = +$('#stc-s').value > 0;
-  const step1 = typed ? +$('#stc-s').value / lf(L) : 0.125 * tier.main[1];   // per refine step, at Lv.1 (12.5% of tier max: confirmed for common only)
-  const guessHigh = !typed && tier.tier !== 'common' && R > 0;
+  const RK = REFINE_STEP[tier.tier] || REFINE_STEP.common;
+  const step1 = typed ? +$('#stc-s').value / lf(L) : RK.k * tier.main[1];   // per refine step, at Lv.1
+  const guessHigh = !typed && !RK.sure && R > 0;
   const roll = v / lf(L) - R * step1;
   const val = (l, r) => (roll + r * step1) * lf(l);
   const inRange = roll >= tier.main[0] - 0.6 && roll <= tier.main[1] + 0.6;
-  out.innerHTML = `<p class="note">ค่าสุ่มเริ่มต้น (Lv.1, +0) ≈ <b>${roll.toFixed(1)}</b> ${inRange ? `อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) ✓` : `<span style="color:var(--warn)">ไม่อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) — ${typed ? 'เช็กระดับหรือตัวเลขที่ใส่' : 'ระดับนี้น่าจะตีบวกได้น้อยกว่า 12.5% ใส่ "เพิ่มต่อขั้น" จากในเกม'}</span>`} · ${typed ? 'ใช้ค่าเพิ่มต่อขั้นที่ใส่' : guessHigh ? '<span style="color:var(--warn)">ระดับนี้ยังไม่รู้ค่าเพิ่มต่อขั้นจริง — ใช้ 12.5% แบบระดับธรรมดาไปก่อน (น่าจะสูงเกิน)</span>' : 'ใช้ค่าเพิ่มต่อขั้น 12.5% ของค่าสูงสุดของระดับ'}</p>
+  out.innerHTML = `<p class="note">ค่าสุ่มเริ่มต้น (Lv.1, +0) ≈ <b>${roll.toFixed(1)}</b> ${inRange ? `อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) ✓` : `<span style="color:var(--warn)">ไม่อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) — ${typed ? 'เช็กระดับหรือตัวเลขที่ใส่' : 'ค่าเพิ่มต่อขั้นของระดับนี้อาจไม่ตรงกับศิลาก้อนนี้ ใส่ "เพิ่มต่อขั้น" จากในเกม'}</span>`} · ${typed ? 'ใช้ค่าเพิ่มต่อขั้นที่ใส่' : `ตีบวกขั้นละ ${RK.k * 100}% ของค่าสูงสุดของระดับ = ${(step1 * lf(L)).toFixed(2)} ต่อขั้นที่ Lv.${L}${guessHigh ? ` <span style="color:var(--warn)">(${RK.how} — ถ้ามีรายการตีบวกในเกม ใส่ "เพิ่มต่อขั้น" จะแม่นกว่า)</span>` : ` (${RK.how})`}`}</p>
     <div class="tw"><table><tr><th>เลเวล \ ตีบวก</th>${[0,1,2,3,4,5].map(r => `<th class="num">+${r}</th>`).join('')}</tr>
     ${Array.from({length:STONE_MAXLV}, (_, i) => i + 1).map(l => `<tr><td>Lv.${l}</td>${[0,1,2,3,4,5].map(r => `<td class="num"${l === L && r === R ? ' style="background:var(--accent-soft);font-weight:700"' : ''}>${val(l, r).toFixed(1)}</td>`).join('')}</tr>`).join('')}</table></div>`;
 });
