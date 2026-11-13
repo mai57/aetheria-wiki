@@ -975,8 +975,8 @@ $('#detail').addEventListener('change', e => {
   else if (d.simLv !== undefined) st.lv = +e.target.value;
   else if (d.simReal !== undefined) st.real = +e.target.value || 0;
   else if (d.simTag) { const t = simTags(info); e.target.checked ? t.add(d.simTag) : t.delete(d.simTag); st.tags = [...t]; }
-  else if (d.simStone !== undefined || d.simTier !== undefined || d.simSlv !== undefined || d.simSval !== undefined || d.simSdmg !== undefined || d.simCspd !== undefined) {
-    const i = +(d.simStone ?? d.simTier ?? d.simSlv ?? d.simSval ?? d.simSdmg ?? d.simCspd); st.stones = st.stones || [];
+  else if (d.simStone !== undefined || d.simTier !== undefined || d.simSlv !== undefined || d.simSval !== undefined || d.simSdmg !== undefined || d.simCspd !== undefined || d.simVary !== undefined) {
+    const i = +(d.simStone ?? d.simTier ?? d.simSlv ?? d.simSval ?? d.simSdmg ?? d.simCspd ?? d.simVary); st.stones = st.stones || [];
     const x = st.stones[i] = st.stones[i] || {tier:'legendary', lv:1};
     if (d.simStone !== undefined) x.id = e.target.value || null;
     if (d.simTier !== undefined) x.tier = e.target.value;
@@ -984,7 +984,8 @@ $('#detail').addEventListener('change', e => {
     if (d.simSval !== undefined) x.val = +e.target.value || 0;
     if (d.simSdmg !== undefined) x.sdmg = +e.target.value || 0;
     if (d.simCspd !== undefined) x.cspd = +e.target.value || 0;
-    if (d.simStone !== undefined) { x.val = 0; x.sdmg = 0; x.cspd = 0; }
+    if (d.simVary !== undefined) { x.vary = e.target.checked; x.val = 0; }
+    if (d.simStone !== undefined) { x.val = 0; x.sdmg = 0; x.cspd = 0; x.vary = false; }
   } else return;
   saveCalc(); rerenderSim(info);
 });
@@ -993,7 +994,7 @@ $('#detail').addEventListener('click', e => {
   const st = simState(info.s.id);
   const u = e.target.closest('[data-sim-use]');
   if (u) { const c = (window.__simBest || [])[+u.dataset.simUse]; if (!c) return;
-    st.stones = c.picks.map(p => ({id:p.st.id, tier:p.tier, lv:p.lv})); saveCalc(); rerenderSim(info); $('#detail').scrollTop = 0; return; }
+    st.stones = c.picks.map(p => ({id:p.st.id, tier:p.tier, lv:p.lv, vary:!!p.vary})); saveCalc(); rerenderSim(info); $('#detail').scrollTop = 0; return; }
   if (e.target.closest('[data-sim-tagreset]')) { st.tags = null; saveCalc(); rerenderSim(info); }
 });
 /* stone page: main value at every stone level × refine step, from the player's own stone */

@@ -49,11 +49,14 @@ const simById = new Map(SIM_SKILLS.map(i => [i.s.id, i]));
 const fitsStone = (st, tags) => { const r = st.requires || {}; return (r.all || []).every(t => tags.has(t)) && (!r.any || r.any.some(t => tags.has(t))) && !(r.not || []).some(t => tags.has(t)); };
 
 // numbers of one stone at a tier / stone level / roll
-function stoneNums(st, tier, lv, roll, val){
+// vary: the variant's main value is the normal one × its factor, and its tooltip text replaces the normal one
+function stoneNums(st, tier, lv, roll, val, vary){
   const t = st.tiers.find(x => x.tier === tier) || st.tiers[st.tiers.length - 1];
-  if (val > 0) return {X:val, raw:val, text:t.text, real:true};
-  const [a, b] = t.main, base = roll === 'min' ? a : roll === 'max' ? b : (a + b) / 2;
-  return {X: base * (1 + PER_LV * (lv - 1) / 100), raw: base, text: t.text};
+  const v = vary && VARS.get(st.id), vt = v && (v.tiers.find(x => x.tier === t.tier) || v.tiers[v.tiers.length - 1]);
+  const text = vt ? vt.text : t.text, f = v ? VARIANT[v.id]?.f ?? 1 : 1;
+  if (val > 0) return {X:val, raw:val, text, real:true};
+  const [a, b] = t.main, base = (roll === 'min' ? a : roll === 'max' ? b : (a + b) / 2) * f;
+  return {X: base * (1 + PER_LV * (lv - 1) / 100), raw: base, text};
 }
 
 /* Each modelled stone returns how it changes one cast. Units:
@@ -120,7 +123,48 @@ const MODEL = {
   hex: X => ({hex:X / 100, note:'เป้ารับดาเมจเพิ่ม 4 วิ'}),
   proliferation: () => ({directMul:0.85, note:'ดาเมจตรง −15% (ส่วนสถานะที่ลามไม่ได้คิด)'}),
 };
-const modelled = st => !!MODEL[st.id];
+/* Variant stones (5% roll): f = main value vs the normal stone (from the game's own variant text),
+   m = how the variant changes the mechanic; without m the normal model is used */
+const VARIANT = {
+  'chain-split': {f:1, m:(X, T, e) => ({pre:X / 100 * Math.min(rng(/พร้อมกัน (\d+) ตัว/, T, 2), e.N - 1)})},
+  'jackpot-steady': {f:0.5},
+  'meteor-heavy': {f:2.2, m:(X, T, e) => ({pre:X / 100 * Math.min(2 * e.N, 3), cdMul:1.2, note:'ดาวตกยักษ์ 3 ลูก'})},
+  'blade-wide': {f:1, m:(X, T, e) => ({preTime:{dur:3, every:0.5, per:X / 100 * e.N}, note:'หมุน 3 วิ รัศมีกว้างขึ้น'})},
+  'berserk-calm': {f:1, m:(X, T, e) => ({plus:X / 100 * Math.min(1, Math.max(0, (e.myHp - 50) / 40)), note:'เต็มค่าที่ HP 90% ขึ้นไป หมดที่ 50%'})},
+  'executioner-prey': {f:1, m:(X, T, e) => { const third = rng(/ดาเมจ \+(\d+)(?:-(\d+))?% กับทุกเป้า/, T, X / 3), above = rng(/มากกว่า (\d+)%/, T, 70);
+    return {plus:(third + (X - third) * (100 - above) / 100) / 100, note:`เฉลี่ยตามเลือดเป้า: มากกว่า ${above}% ได้เต็ม`}; }},
+  'multistrike-triple': {f:0.697, m:(X, T) => ({repeat:3, repeatX:X / 100, cdMul:1 + rng(/คูลดาวน์ \+(\d+)%/, T, 10) / 100, note:'สกิลออก 3 รอบ รอบละ X%'})},
+  'flurry-opener': {f:1.1},
+  'trauma-quick': {f:2.2, m:X => ({trauma:X / 100, traumaMax:5, traumaReset:3, delayMul:1.15, note:'สูงสุด 5 ชั้น (หายถ้าไม่ได้ตี 3 วิ)'})},
+  'spell-totem-giant': {f:2.2, m:(X, T, e) => ({preTime:{dur:8, every:2.4, per:X / 100 * e.skillT}, cdMul:1.3})},
+  'mirage-assassin': {f:3.6, m:(X, T, e) => ({preTime:{dur:1.2, every:1.2, per:X / 100 * e.skillT}, note:'ร่างเงาพุ่งใส่ครั้งเดียวต่อการกด (ออกได้ทุก 1.2 วิ)'})},
+  'time-bomb-short-fuse': {f:1},
+  'aftershock-double': {f:0.55, m:(X, T, e) => ({post:2 * X / 100 * e.skillT, note:'พื้นสั่น 2 ครั้ง ครั้งละ X%'})},
+  'storm-follow-anchor': {f:0.75, m:(X, T, e) => ({preTime:{dur:6, every:1, per:X / 100 * e.N}, note:'พื้นที่ค้างตรงที่ร่าย 6 วิ (ถือว่ามอนยังอยู่ในวง)'})},
+  'ignite-smolder': {f:0.55, m:X => ({dot:{pct:X / 100, sec:6}})},
+  'impale-deep': {f:2.2, m:X => ({dot:{pct:X / 100, sec:2}, bleed:true})},
+  'fork-scatter': {f:0.55, m:(X, T, e) => ({pre:X / 100 * Math.min(4, e.N - 1)})},
+  'fire-dragon-blaze': {f:0.7, m:(X, T, e) => ({set:X / 100, post:0.9 * e.N, note:'หัวมังกร X% + ไฟลุก 15% × 6 วิ ทุกตัวในวง'})},
+  'divine-dice-loaded': {f:1},
+  'combo-rhythm': {f:0.66, m:X => ({combo:X / 100, comboEvery:3, note:'ทุกครั้งที่ 3 ในการร่าย คริแน่นอน + ดาเมจคริ X%'})},
+  'arcane-flow-tide': {f:1.3, m:X => ({tide:{x:X / 100, p:0.45, dur:10}, note:'โอกาส 45% ต่อการร่าย บัฟ 10 วิ — ครั้งแรกยังไม่ได้'})},
+  'cleave-wide': {f:0.5},
+  'ruthless-quick': {f:0.85, m:X => ({ruthless:X / 100, ruthlessEvery:2, note:'ทุกครั้งที่ 2 ×X อื่น ๆ −5%'})},
+  'concentrate-loose': {f:0.5, m:X => ({plus:X / 100, note:'ไม่ลดพื้นที่'})},
+  'static-web': {f:0.66, m:(X, T, e) => ({post:X / 100 * (e.N > 1 ? Math.min(5, e.N - 1) : 0.5)})},
+  'elemental-focus-tempered': {f:0.55},
+  'spell-echo-twin': {f:0.55, m:(X, T, e) => ({pre:2 * X / 100 * e.skillT, cdMul:1.3, note:'ร่ายซ้ำ 2 ครั้ง ครั้งละ X%'})},
+  'volley-rain': {f:0.55, m:X => ({post:2 * X / 100, note:'ยิงซ้ำ 2 ลูก ลูกละ X%'})},
+  'scatter-rain-focus': {f:1.85, m:(X, T, e) => ({pre:X / 100 * 4 * (e.N > 1 ? Math.min(e.N, 2) : 0.75), note:'ตก 4 จุดวงแคบ (ถือว่าโดนเป้า 3 ใน 4 จุดถ้ามอน 1 ตัว)'})},
+  'proliferation-plague': {f:0.65},
+  'point-blank-close': {f:0.75, m:(X, T, e) => ({plus:e.near ? X / 100 : -0.25, note:'นับใกล้ถึง 5 ช่อง ไกลกว่านั้น −25%'})},
+};
+const VARS = new Map((DATA.stones.variants?.list || []).map(v => [v.stone, v]));
+const varOf = st => VARS.get(st.id);
+const modelFn = (st, vary) => { const v = vary && varOf(st), vm = v && VARIANT[v.id]; return v ? (vm ? vm.m || MODEL[st.id] : null) : MODEL[st.id]; };
+const modelled = (st, vary) => !!modelFn(st, vary);
+const vShort = v => v.id.slice(v.stone.length + 1).replace(/(^|-)(\w)/g, (_, s, c) => (s ? ' ' : '') + c.toUpperCase());
+const pickName = p => `${isWhole(p.st) ? '◆ ' : ''}${stoneName(p.st)}${p.vary && varOf(p.st) ? ` ✦ ${vShort(varOf(p.st))}` : ''}`;
 
 /* simulate casting the skill back-to-back for env.D seconds */
 function simulate(info, lv, picks, env){
@@ -130,17 +174,18 @@ function simulate(info, lv, picks, env){
   const bleed = picks.some(p => p.st.id === 'impale');
   const e0 = {...env, bleed, lvScale, skillT:info.area ? env.N : 1};
   for (const p of picks) {
-    const {X, text} = stoneNums(p.st, p.tier, p.lv, env.roll, p.val);
-    const f = MODEL[p.st.id];
+    const {X, text} = stoneNums(p.st, p.tier, p.lv, env.roll, p.val, p.vary);
+    const f = modelFn(p.st, p.vary);
     effs.push({p, X, eff:f ? f(X, text, {...e0, lvScale:1 + PER_LV * (p.lv - 1) / 100}) : null});
   }
-  const agg = {plus:0, set:null, sep:1, cdMul:1, castMul:1, castAdd:0, delayMul:1, hitsAdd:0, directMul:1, jackpot:1, primary:0, neutral:false, trauma:0, combo:0, ruthless:0, arcane:0, hex:0, repeat:0, repeatX:0};
+  const agg = {plus:0, set:null, sep:1, cdMul:1, castMul:1, castAdd:0, delayMul:1, hitsAdd:0, directMul:1, jackpot:1, primary:0, neutral:false, trauma:0, combo:0, ruthless:0, arcane:0, hex:0, repeat:0, repeatX:0, traumaMax:10, traumaReset:4, comboEvery:5, ruthlessEvery:3, tide:null};
   for (const {eff} of effs) if (eff) {
     if (eff.repeat) { agg.repeat = eff.repeat; agg.repeatX = eff.repeatX; }
     for (const k of ['plus','hitsAdd','castAdd','primary','trauma','combo','ruthless','arcane','hex']) if (eff[k]) agg[k] += eff[k];
     for (const k of ['sep','cdMul','castMul','delayMul','directMul','jackpot']) if (eff[k]) agg[k] *= eff[k];
     if (eff.set != null) agg.set = eff.set;
     if (eff.neutral) agg.neutral = true;
+    for (const k of ['traumaMax','traumaReset','comboEvery','ruthlessEvery','tide']) if (eff[k]) agg[k] = eff[k];
   }
   const E = agg.neutral ? 1 : env.elMult, c = Math.min(1, Math.max(0, env.crit / 100)), cmul = env.critDmg / 100;
   const sdmg = picks.reduce((a, p) => a + (+p.sdmg || 0), 0);
@@ -156,7 +201,7 @@ function simulate(info, lv, picks, env){
   const hexOn = () => agg.hex && cycle <= 4 && casts > 1 ? 1 + agg.hex : 1;
   while (t < env.D - 1e-9) {
     casts++;
-    if (t - lastHit > 4) stacks = 0;
+    if (t - lastHit > agg.traumaReset) stacks = 0;
     // every hit of the cast in order: the normal round, then any repeat rounds (Multistrike);
     // each hit can add a Trauma stack, count toward Combo's 5th hit and Ruthless' 3rd hit
     let hs = 0, k = 0;
@@ -164,14 +209,16 @@ function simulate(info, lv, picks, env){
     for (let round = 0; round < rounds; round++) {
       for (let j = 1; j <= n; j++) {
         k++;
-        let m = (agg.combo && k % 5 === 0) ? cmul + agg.combo : cf;
-        if (agg.trauma) { m *= 1 + stacks * agg.trauma; stacks = Math.min(10, stacks + 1); }
-        if (agg.ruthless) { dmgCount++; m *= dmgCount % 3 === 0 ? agg.ruthless : 0.95; }
+        let m = (agg.combo && k % agg.comboEvery === 0) ? cmul + agg.combo : cf;
+        if (agg.trauma) { m *= 1 + stacks * agg.trauma; stacks = Math.min(agg.traumaMax, stacks + 1); }
+        if (agg.ruthless) { dmgCount++; m *= dmgCount % agg.ruthlessEvery === 0 ? agg.ruthless : 0.95; }
         hs += m * w;
       }
     }
     lastHit = t;
-    const arc = agg.arcane && casts > 1 && cycle <= 5 ? agg.arcane : 0;
+    // Arcane Flow tide variant: buff is up if any earlier cast inside its 10 s window rolled the 45%
+    const tideN = agg.tide ? Math.min(casts - 1, Math.floor(agg.tide.dur / cycle + 1e-9)) : 0;
+    const arc = (agg.arcane && casts > 1 && cycle <= 5 ? agg.arcane : 0) + (agg.tide ? agg.tide.x * (1 - Math.pow(1 - agg.tide.p, tideN)) : 0);
     const wMul = agg.set != null ? agg.set + agg.plus + arc : 1 + agg.plus + arc;
     const hx = hexOn();
     const direct = base * hs * Math.max(0, wMul) * agg.sep * agg.directMul * agg.jackpot * hx;
@@ -187,7 +234,7 @@ function simulate(info, lv, picks, env){
     t += cycle;
   }
   const total = [...src.values()].reduce((a, v) => a + v, 0);
-  for (const {p, eff} of effs) if (!eff) warn.push(`${stoneName(p.st)}: ยังไม่ได้คำนวณผลของศิลานี้`);
+  for (const {p, eff} of effs) if (!eff) warn.push(`${pickName(p)}: ยังไม่ได้คำนวณผลของศิลานี้`);
   return {total, dps:total / env.D, casts, cycle, src, effs, B0, base, cf, n, warn};
 }
 function checkPicks(info, tags, picks){
@@ -203,17 +250,18 @@ const reqText = st => { const r = st.requires || {}, f = a => a.map(t => TAG_TH[
   return [r.all?.length ? f(r.all) : '', r.any?.length ? 'อย่างใดอย่างหนึ่ง: ' + r.any.map(t => TAG_TH[t] || t).join(' / ') : '', r.not?.length ? 'ไม่ใช่: ' + r.not.map(t => TAG_TH[t] || t).join(' / ') : ''].filter(Boolean).join(' · '); };
 
 /* ---------- state ---------- */
-calc.sim = Object.assign({N:1, D:30, crit:0, critDmg:150, elMult:1, myHp:100, minI:0.5, bonus:0, party:false, frozen:false, near:true, roll:'avg', searchTier:'legendary', searchLv:1, per:{}}, calc.sim || {});
+calc.sim = Object.assign({N:1, D:30, crit:0, critDmg:150, elMult:1, myHp:100, minI:0.5, bonus:0, party:false, frozen:false, near:true, roll:'avg', searchTier:'legendary', searchLv:1, searchVary:false, per:{}}, calc.sim || {});
 const simState = id => calc.sim.per[id] ||= {lv:null, stones:[], tags:null, real:0};
 const simTags = info => new Set(simState(info.s.id).tags || [...info.guess]);
 const sockets = lv => UNLOCK.filter(u => lv >= u).length;
 const envOf = () => { const s = calc.sim; return {N:Math.max(1, +s.N || 1), D:Math.max(1, +s.D || 30), crit:+s.crit || 0, critDmg:+s.critDmg || 150, elMult:+s.elMult || 0, myHp:+s.myHp || 100, minI:Math.max(0.1, +s.minI || 0.5), bonus:+s.bonus || 0, party:!!s.party, frozen:!!s.frozen, near:!!s.near, roll:s.roll}; };
-const picksOf = (info, st) => (st.stones || []).slice(0, sockets(st.lv)).filter(x => x && stoneById.has(x.id)).map(x => ({st:stoneById.get(x.id), tier:x.tier || 'legendary', lv:x.lv || 1, val:+x.val || 0, sdmg:+x.sdmg || 0, cspd:+x.cspd || 0}));
+const picksOf = (info, st) => (st.stones || []).slice(0, sockets(st.lv)).filter(x => x && stoneById.has(x.id)).map(x => ({st:stoneById.get(x.id), tier:x.tier || 'legendary', lv:x.lv || 1, val:+x.val || 0, sdmg:+x.sdmg || 0, cspd:+x.cspd || 0, vary:!!(x.vary && VARS.has(x.id))}));
 
 function bestCombos(info, lv, tags, env){
   const k = sockets(lv); if (!k) return [];
-  const cand = STONES.filter(st => modelled(st) && fitsStone(st, tags));
-  const mk = st => ({st, tier:calc.sim.searchTier, lv:+calc.sim.searchLv || 1});
+  // candidates are (stone, variant?) pairs; a stone and its own variant never go together (same stone twice)
+  const cand = STONES.filter(st => fitsStone(st, tags)).flatMap(st => [false, true].filter(v => (!v || calc.sim.searchVary && VARS.has(st.id)) && modelled(st, v)).map(vary => ({st, vary})));
+  const mk = c => ({st:c.st, vary:c.vary, tier:calc.sim.searchTier, lv:+calc.sim.searchLv || 1});
   const out = [], base = simulate(info, lv, [], env).total;
   const rec = (start, cur) => {
     if (cur.length) {
@@ -267,6 +315,7 @@ function simDetail(info){
       <select data-sim-stone="${i}" style="flex:1;min-width:200px">${stoneOpt(x.id)}</select>
       <select data-sim-tier="${i}">${TIERS.map(t => `<option value="${t}"${(x.tier || 'legendary') === t ? ' selected' : ''}>${RARITY[t]}</option>`).join('')}</select>
       <label>เลเวล <select data-sim-slv="${i}">${Array.from({length:STONE_MAXLV}, (_, j) => `<option${(x.lv || 1) === j + 1 ? ' selected' : ''}>${j + 1}</option>`).join('')}</select></label>
+      ${x.id && VARS.has(x.id) ? `<label title="${esc(VARS.get(x.id).effect)}"><input type="checkbox" data-sim-vary="${i}"${x.vary ? ' checked' : ''}> ✦ แปรผัน (${esc(VARS.get(x.id).thai)})</label>` : ''}
       <label title="ดูได้จาก tooltip ศิลาในเกม หัวข้อ 'เลเวลศิลา' → ค่าหลัก — ใส่แล้วใช้แทนค่าตามระดับ/เลเวล (รวมตีบวกแล้ว)">ค่าหลัก <input type="number" step="any" data-sim-sval="${i}" value="${x.val || ''}" placeholder="—" style="width:70px"></label></div>
       ${x.id ? `<div class="cc-ctl" style="margin-top:-4px;padding-left:52px"><span class="note">บรรทัดเสริมใน tooltip:</span>
         <label>ดาเมจสกิลนี้ + <input type="number" step="any" data-sim-sdmg="${i}" value="${x.sdmg || ''}" placeholder="0" style="width:56px"> %</label>
@@ -275,7 +324,8 @@ function simDetail(info){
     <section><h2>ผลจำลอง</h2><div id="sim-out"></div></section>
     <section><h2>ชุดศิลาที่ดีที่สุดสำหรับสกิลนี้</h2>
       <div class="cc-ctl"><label>ค้นหาด้วยศิลาระดับ <select data-sim="searchTier">${TIERS.map(t => `<option value="${t}"${S.searchTier === t ? ' selected' : ''}>${RARITY[t]}</option>`).join('')}</select></label>
-      <label>เลเวลศิลา <select data-sim="searchLv">${Array.from({length:STONE_MAXLV}, (_, j) => `<option${+S.searchLv === j + 1 ? ' selected' : ''}>${j + 1}</option>`).join('')}</select></label></div>
+      <label>เลเวลศิลา <select data-sim="searchLv">${Array.from({length:STONE_MAXLV}, (_, j) => `<option${+S.searchLv === j + 1 ? ' selected' : ''}>${j + 1}</option>`).join('')}</select></label>
+      ${chk('searchVary', '✦ รวมศิลาแปรผันด้วย')}</div>
       <div id="sim-best"></div></section>
     <p class="note">สูตรเป็นการประมาณ: ไม่รู้สูตรดาเมจจริงของเกม (ATK → ดาเมจ, DEF) จึงแสดงเป็น % ของ ${unit} · ศิลาป้าย "ดาเมจทั้งสกิล" (◆) ใส่ได้ก้อนเดียว · ศิลาที่ตีเพิ่ม/เลือดไหลคิดจากดาเมจก่อนศิลาตามที่เกมเขียนไว้ ·
     เลเวลศิลาเพิ่มค่าหลัก ${PER_LV}% ต่อเลเวล · ไม่นับ DEF ของมอน ความเร็วโจมตี และการ์ด</p>`;
@@ -287,9 +337,9 @@ function runSim(info){
   const picks = picksOf(info, st), r = simulate(info, st.lv, picks, env), r0 = simulate(info, st.lv, [], env);
   const scale = st.real > 0 ? st.real / r0.B0 : 0, unit = info.mag ? 'MATK' : 'ATK';
   const issues = checkPicks(info, tags, picks);
-  const name = k => k === 'skill' ? 'ดาเมจสกิล' : (stoneById.has(k) ? stoneName(stoneById.get(k)) : k);
-  $('#sim-stones').innerHTML = picks.map(p => { const {X, text, real} = stoneNums(p.st, p.tier, p.lv, env.roll, p.val); const e = r.effs.find(x => x.p === p)?.eff;
-    return `<div class="note" style="margin-top:4px">${isWhole(p.st) ? '◆ ' : ''}<b>${esc(stoneName(p.st))}</b> ${esc(RARITY[p.tier])} Lv.${p.lv}: ${esc(text)} → ใช้ค่า <b>${+X.toFixed(1)}</b>${real ? ' (ค่าจริงที่ใส่เอง)' : ''}${e?.note ? ` · ${esc(e.note)}` : ''}${!e ? ' · <span style="color:var(--warn)">ยังไม่คำนวณ</span>' : ''}</div>`; }).join('');
+  const name = k => k === 'skill' ? 'ดาเมจสกิล' : (picks.find(p => p.st.id === k) ? pickName(picks.find(p => p.st.id === k)) : stoneById.has(k) ? stoneName(stoneById.get(k)) : k);
+  $('#sim-stones').innerHTML = picks.map(p => { const {X, text, real} = stoneNums(p.st, p.tier, p.lv, env.roll, p.val, p.vary); const e = r.effs.find(x => x.p === p)?.eff;
+    return `<div class="note" style="margin-top:4px"><b>${esc(pickName(p))}</b> ${esc(RARITY[p.tier])} Lv.${p.lv}: ${esc(text)} → ใช้ค่า <b>${+X.toFixed(1)}</b>${real ? ' (ค่าจริงที่ใส่เอง)' : ''}${e?.note ? ` · ${esc(e.note)}` : ''}${!e ? ' · <span style="color:var(--warn)">ยังไม่คำนวณ</span>' : ''}</div>`; }).join('');
   out.innerHTML = `${issues.length ? `<div class="mul w" style="display:block;text-align:left;padding:6px 10px;margin-bottom:8px">${issues.map(esc).join('<br>')}</div>` : ''}
     <div class="kv">
       <div><span>ดาเมจรวม ${env.D} วิ</span><b>${fmtD(r.total, scale)}</b></div>
@@ -305,9 +355,9 @@ function runSim(info){
   const best = bestCombos(info, st.lv, tags, env);
   $('#sim-best').innerHTML = !best.list?.length ? `<p class="empty">${sockets(st.lv) ? 'ไม่มีศิลาที่คำนวณได้สำหรับสกิลประเภทนี้' : 'สกิลเลเวลนี้ยังไม่มีช่องศิลา'}</p>`
     : `<div class="tw"><table><tr><th>#</th><th>ศิลา</th><th class="num">รวม ${env.D} วิ</th><th class="num">เทียบไม่ใส่</th><th></th></tr>
-      ${best.list.map((x, i) => `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td>${x.picks.map(p => `${isWhole(p.st) ? '◆ ' : ''}${esc(stoneName(p.st))}`).join(' + ')}</td><td class="num">${fmtD(x.total, scale)}</td><td class="num"><b>+${Math.round((x.total / best.base - 1) * 100)}%</b></td>
+      ${best.list.map((x, i) => `<tr class="${i === 0 ? 'best' : ''}"><td>${i + 1}</td><td>${x.picks.map(p => esc(pickName(p))).join(' + ')}</td><td class="num">${fmtD(x.total, scale)}</td><td class="num"><b>+${Math.round((x.total / best.base - 1) * 100)}%</b></td>
       <td><button class="chipbtn" data-sim-use="${i}">ใส่ชุดนี้</button></td></tr>`).join('')}</table></div>
-      <p class="note">ลองทุกชุดจากศิลาที่ใส่ได้และคำนวณได้ ${best.cand} แบบ ตามประเภทสกิลด้านบนและสถานการณ์ที่ตั้งไว้</p>`;
+      <p class="note">ลองทุกชุดจากศิลาที่ใส่ได้และคำนวณได้ ${best.cand} แบบ${calc.sim.searchVary ? ' (รวมแบบแปรผัน ✦)' : ''} ตามประเภทสกิลด้านบนและสถานการณ์ที่ตั้งไว้</p>`;
   window.__simBest = best.list;
 }
 
