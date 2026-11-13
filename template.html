@@ -722,16 +722,28 @@ const CATS = {
   },
   stones: {
     label:'ศิลาปลุกพลัง',
+    // variants: a stone can roll as its variant (chancePercent), which trades one part of the effect for another
+    vars: (() => { const m = new Map(); for (const v of DATA.stones.variants?.list || []) { if (!m.has(v.stone)) m.set(v.stone, []); m.get(v.stone).push(v); } return m; })(),
     all: DATA.stones.list,
-    filters: st => `<input type="search" data-k="q" placeholder="ค้นหาศิลา หรือผล" value="${esc(st.q)}">`,
-    match: () => true,
-    text: s => `${s.thai} ${s.name||''} ${s.id} ${s.effect||''}`,
-    row: s => ({ic:'', name: esc(s.name || s.thai), sub: esc(s.thai || s.id), right: esc(s.role || '')}),
+    filters: st => `<input type="search" data-k="q" placeholder="ค้นหาศิลา หรือผล (รวมแปรผัน)" value="${esc(st.q)}">
+      <label><input type="checkbox" data-k="vary"${st.vary?' checked':''}> ✦ มีแปรผัน</label>`,
+    match: (s, st) => !st.vary || CATS.stones.vars.has(s.id),
+    text: s => `${s.thai} ${s.name||''} ${s.id} ${s.effect||''} ${(CATS.stones.vars.get(s.id) || []).map(v => `${v.thai} ${v.id} ${v.effect}`).join(' ')}`,
+    row: s => { const vs = CATS.stones.vars.get(s.id);
+      return {ic:'', name: `${esc(s.name || s.thai)}${vs ? ` <span title="มีแปรผัน: ${esc(vs.map(v => v.thai).join(', '))}" style="color:var(--accent)">✦</span>` : ''}`, sub: esc(s.thai || s.id) + (vs ? ` · แปรผัน: ${esc(vs.map(v => v.thai).join(', '))}` : ''), right: esc(s.role || '')}; },
     get: id => DATA.stones.list.find(s => s.id === id),
     detail: s => {
-      let h = `<div class="dh"><div><h1>${esc(s.name || s.thai)}</h1><div class="sub">${esc(s.thai||'')} · ${esc(s.id)}${s.role ? ' · ' + esc(s.role) : ''}</div></div></div>`;
+      const vs = CATS.stones.vars.get(s.id) || [], vch = DATA.stones.variants?.chancePercent;
+      const vName = v => v.id.startsWith(s.id + '-') ? v.id.slice(s.id.length + 1).replace(/(^|-)(\w)/g, (_, d, c) => (d ? ' ' : '') + c.toUpperCase()) : v.id;
+      let h = `<div class="dh"><div><h1>${esc(s.name || s.thai)}</h1><div class="sub">${esc(s.thai||'')} · ${esc(s.id)}${s.role ? ' · ' + esc(s.role) : ''}</div>
+        ${vs.length ? `<div class="tags"><button type="button" class="tag star" style="cursor:pointer;font:inherit" data-jump="stone-vars">✦ มีแปรผัน: ${esc(vs.map(v => v.thai).join(', '))} ↓</button></div>` : ''}</div></div>`;
       if (s.effect) h += `<section><p>${esc(s.effect)}</p></section>`;
       if (s.tiers?.length) h += `<section><h2>ระดับ</h2><div class="tw"><table><tr><th>ระดับ</th><th>ผล</th></tr>${s.tiers.map(t => `<tr><td class="r-${t.tier}">${esc(RARITY[t.tier]||t.tier)}</td><td>${esc(t.text)}</td></tr>`).join('')}</table></div></section>`;
+      for (const v of vs) h += `<section id="stone-vars"><h2>✦ แปรผัน: ${esc(vName(v))} · ${esc(v.thai)}</h2>
+        <p>${esc(v.effect)}</p>
+        <p class="note">ศิลาที่ได้มามีโอกาส ${vch ?? '?'}% ออกเป็นแบบแปรผันแทนแบบปกติ (ชนิดเดียวกัน ผลบางส่วนเปลี่ยนตามด้านบน)</p>
+        <div class="tw"><table><tr><th>ระดับ</th><th>แบบปกติ</th><th>✦ แบบแปรผัน</th></tr>${v.tiers.map(t => { const n = (s.tiers || []).find(x => x.tier === t.tier);
+          return `<tr><td class="r-${t.tier}">${esc(RARITY[t.tier]||t.tier)}</td><td>${esc(n?.text || '-')}</td><td><b>${esc(t.text)}</b></td></tr>`; }).join('')}</table></div></section>`;
       if (s.tiers?.length) {
         const f = l => 1 + PER_LV * (l - 1) / 100, r1 = x => +x.toFixed(1);
         h += `<section><h2>ค่าหลักตามเลเวลศิลา</h2>
@@ -749,7 +761,7 @@ const CATS = {
             <label>ระดับ <select id="stc-t">${s.tiers.map(t => `<option value="${t.tier}">${esc(RARITY[t.tier] || t.tier)}</option>`).join('')}</select></label></div>
           <div class="cc-ctl">
             <label>เพิ่มต่อขั้นตีบวก <input type="number" step="any" id="stc-s" placeholder="ไม่รู้ก็เว้นไว้" style="width:110px"></label>
-            <span class="note">= ค่าขั้นถัดไป − ค่าขั้นนี้ ในรายการตีบวก (ที่เลเวลศิลาตอนนี้) · เว้นว่าง = ประมาณ 12.5% ของค่าสูงสุดของระดับ</span></div>
+            <span class="note">= ค่าขั้นถัดไป − ค่าขั้นนี้ ในรายการตีบวก (ที่เลเวลศิลาตอนนี้) · เว้นว่าง = ใช้สูตร A/B ตามด้านล่าง</span></div>
           <div id="stc-out"></div>
           <p class="note">สูตร: ค่าหลัก = (ค่าสุ่ม + ขั้นตีบวก × ค่าเพิ่มต่อขั้น) × (1 + ${PER_LV}% × (เลเวล − 1)) — ตีบวกเพิ่มเท่ากันทุกขั้น และเลเวลคูณทับค่าที่ตีบวกแล้ว · ตีบวกเพิ่มขั้นละเท่าไรมี 2 สูตรที่ตรงกับในเกม: <b>A</b> = 12.5% ของค่าสูงสุดระดับธรรมดา (ศิลาธรรมดาทุกก้อน, Trauma, Arcane Flow) · <b>B</b> = % ของค่าสูงสุดของระดับนั้น หายาก 5% / มหากาพย์ ~2% (Cooldown Recovery, Brutality, Multistrike) · ศิลาชนิดอื่นเลือกสูตรที่ทำให้ค่าสุ่มอยู่ในช่วงของระดับ</p></section>`;
       }
@@ -992,6 +1004,7 @@ const REFINE_B = {common:0.125, rare:0.05, epic:0.02, legendary:0.008};
 const REFINE_KNOWN = {trauma:'A', 'arcane-flow':'A', 'cooldown-recovery':'B', brutality:'B', multistrike:'B'};
 const refineStep = (st, tier, rule) => rule === 'A' ? 0.125 * (st.tiers.find(t => t.tier === 'common') || tier).main[1] : (REFINE_B[tier.tier] ?? 0.125) * tier.main[1];
 const RULE_TXT = {A:'ขั้นละ 12.5% ของค่าสูงสุดระดับธรรมดา', B:'ขั้นละ % ของค่าสูงสุดของระดับนี้ (ธรรมดา 12.5 · หายาก 5 · มหากาพย์ ~2 · ตำนาน ~0.8)'};
+$('#detail').addEventListener('click', e => { const j = e.target.closest('[data-jump]'); if (j) document.getElementById(j.dataset.jump)?.scrollIntoView({behavior:'smooth', block:'start'}); });
 $('#detail').addEventListener('input', e => {
   if (!['stc-v', 'stc-l', 'stc-r', 'stc-t', 'stc-s'].includes(e.target.id)) return;
   const st = CATS.stones.get(state.stones.sel); if (!st) return;

@@ -45,7 +45,7 @@ def build():
         "elements": wiki["elements"],
         "maps": wiki["maps"],
         "skillBook": wiki["skillBook"],
-        "stones": {k: wiki["stones"].get(k) for k in ("list", "unlock", "level")},
+        "stones": {k: wiki["stones"].get(k) for k in ("list", "unlock", "level", "variants")},
         "icons": {"items": icons.get("items", {}), "skills": icons.get("skills", {})},
         "monsterArt": {k: v.get("file") for k, v in art.items() if isinstance(v, dict)},
     }
