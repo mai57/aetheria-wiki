@@ -68,6 +68,8 @@ main{flex:1;display:grid;grid-template-columns:minmax(300px,380px) 1fr;min-heigh
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .tag{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);font-size:12px;white-space:nowrap}
 .tag.star{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.tag.far{background:var(--warn-bg);border-color:var(--warn);color:var(--warn)}
+.tag.farsk{border-style:dashed;color:var(--warn)}
 .el{display:inline-block;padding:0 7px;border-radius:999px;font-size:12px;color:#fff;white-space:nowrap}
 section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
 section h2{margin:0 0 10px;font-size:15px;color:var(--accent)}
@@ -241,6 +243,13 @@ const className = new Map(SB.classes.map(c => [c.id, c.name]));
 
 const monLink = id => { const m = monById.get(String(id)); return m ? `<a class="mini" href="#monsters/${m.id}">${img(monArt(m.id))}${esc(m.name)}</a> <span class="note">Lv.${m.level}</span>` : `#${id}`; };
 const itemLink = id => { const i = itemById.get(String(id)); if (!i) return `#${id}`; const cat = i.type === 'Card' ? 'cards' : 'items'; return `<a class="mini r-${i.rarity}" href="#${cat}/${i.id}">${img(itemIcon(i.id))}${esc(i.name)}</a>`; };
+/* ranged marks: normal attack 4+ tiles = ตีไกล; melee monsters whose skills reach 4+ tiles = สกิลไกล (same threshold as the defence calc) */
+const FAR = 4;
+const rangeOf = m => { const sk = (m.skills || []).filter(s => (s.rangeTiles || 0) >= FAR); return {far:m.attackRangeTiles >= FAR, sk, skMax:Math.max(0, ...sk.map(s => s.rangeTiles))}; };
+const rangeTag = m => { const r = rangeOf(m), sn = r.sk.map(s => `${s.name} ${s.rangeTiles} ช่อง`).join(', ');
+  return r.far ? `<span class="tag far" title="ตีปกติได้ไกล ${m.attackRangeTiles} ช่อง${sn ? ' · สกิล: ' + esc(sn) : ''}">🏹 ตีไกล ${m.attackRangeTiles} ช่อง</span>`
+    : r.sk.length ? `<span class="tag farsk" title="ตีปกติระยะประชิด แต่สกิลถึง: ${esc(sn)}">↗ สกิลไกล ${r.skMax} ช่อง</span>` : ''; };
+const rangeIcon = m => { const r = rangeOf(m); return r.far ? `<span title="ตีไกล ${m.attackRangeTiles} ช่อง">🏹</span> ` : ''; };
 const mapLink = id => { const m = mapById.get(id); return m ? `<a href="#maps/${m.id}">${m.star ? '★ ' : ''}${esc(m.name)}</a>` : esc(mapName.get(id) || id); };
 
 /* ---------- shared detail blocks ---------- */
@@ -629,18 +638,19 @@ const CATS = {
       <select data-k="race">${opts(RACE, 'ทุกเผ่า', st.race)}</select>
       <select data-k="size">${opts(SIZE, 'ทุกขนาด', st.size)}</select>
       <label><input type="checkbox" data-k="star"${st.star?' checked':''}> มอนดาว</label>
-      <label><input type="checkbox" data-k="boss"${st.boss?' checked':''}> บอส</label>`,
-    match: (m, st) => (!st.el || m.element === st.el) && (!st.race || m.race === st.race) && (!st.size || m.size === st.size) && (!st.star || m.star) && (!st.boss || m.boss),
+      <label><input type="checkbox" data-k="boss"${st.boss?' checked':''}> บอส</label>
+      <label><input type="checkbox" data-k="far"${st.far?' checked':''}> 🏹 ตีไกล</label>`,
+    match: (m, st) => (!st.el || m.element === st.el) && (!st.race || m.race === st.race) && (!st.size || m.size === st.size) && (!st.star || m.star) && (!st.boss || m.boss) && (!st.far || rangeOf(m).far),
     text: m => `${m.name} #${m.id} ${(m.spawns||[]).map(s=>s.map).join(' ')}`,
-    row: m => ({ic: img(monArt(m.id)), name: `${m.star ? '<span title="มอนดาว" style="color:var(--accent)">★</span> ' : ''}${m.boss ? '👑 ' : ''}${esc(m.name)}`,
-      sub: `${EL[m.element]} ${m.elementLevel} · ${RACE[m.race]||m.race} · ${SIZE[m.size]||m.size}`, right: `Lv.${m.level}`}),
+    row: m => ({ic: img(monArt(m.id)), name: `${m.star ? '<span title="มอนดาว" style="color:var(--accent)">★</span> ' : ''}${m.boss ? '👑 ' : ''}${rangeIcon(m)}${esc(m.name)}`,
+      sub: `${EL[m.element]} ${m.elementLevel} · ${RACE[m.race]||m.race} · ${SIZE[m.size]||m.size}${rangeOf(m).far ? ` · ตีไกล ${m.attackRangeTiles}` : ''}`, right: `Lv.${m.level}`}),
     get: id => monById.get(id),
     detail: m => {
       let h = `<div class="dh"><div class="big mon">${img(monArt(m.id))}</div><div>
         <h1>${m.boss ? '👑 ' : ''}${esc(m.name)}</h1>
         <div class="sub">#${m.id} · Lv.${m.level}</div>
         <div class="tags">${elTag(m.element, m.elementLevel)}<span class="tag">เผ่า ${esc(RACE[m.race]||m.race)}</span><span class="tag">ขนาด ${esc(SIZE[m.size]||m.size)}</span>
-        ${m.star ? `<span class="tag star">★ มอนดาว</span>` : ''}${m.boss ? `<span class="tag star">บอส</span>` : ''}</div></div></div>`;
+        ${m.star ? `<span class="tag star">★ มอนดาว</span>` : ''}${m.boss ? `<span class="tag star">บอส</span>` : ''}${rangeTag(m)}</div></div></div>`;
       if (m.star) h += `<section><h2>★ มอนดาว</h2><p>เลือด x${m.star.hpMultiplier} (ปกติ ${num(m.star.baseHp)}) · ลดดาเมจที่ได้รับ ${m.star.reduction}% · ดูดเลือดผู้เล่นในแผนที่ดาวได้ไม่เกิน ${m.star.drainCap}% ของ Max HP ต่อวินาที</p></section>`;
       h += weaknessTable(m);
       const st = m.stats || {};
@@ -678,7 +688,7 @@ const CATS = {
         <div class="sub">มอนเลเวล ${mp.min === mp.max ? mp.min : `${mp.min}–${mp.max}`} · ${mp.list.length} ชนิด</div>
         <div class="tags">${mp.star ? `<span class="tag star">★ แผนที่ดาว</span>` : ''}${mp.boss ? `<span class="tag star">มีบอส</span>` : ''}</div></div></div>`;
       if (mp.star) h += `<section><p>แผนที่มีดาว: มอนทั่วไปเป็นมอนดาว เลือดมากขึ้นและลดดาเมจที่ได้รับ บอสไม่เปลี่ยน</p></section>`;
-      h += `<section><h2>มอนสเตอร์ในแผนที่</h2><div class="tw"><table><tr><th>มอนสเตอร์</th><th class="num">Lv</th><th class="num">HP</th><th class="num">EXP</th><th>ธาตุ</th><th>เผ่า</th><th>ขนาด</th><th>ตี</th></tr>${mp.list.map(({m, count}) => `<tr><td>${m.star ? '★ ' : ''}${m.boss ? '👑 ' : ''}<a class="mini" href="#monsters/${m.id}">${img(monArt(m.id))}${esc(m.name)}</a></td><td class="num">${m.level}</td><td class="num">${num(m.hp)}</td><td class="num">${num(m.exp)}</td><td>${elTag(m.element, m.elementLevel)}</td><td>${esc(RACE[m.race]||m.race)}</td><td>${esc(SIZE[m.size]||m.size)}</td><td>${m.magicAttack ? 'เวท' : 'กายภาพ'} <span class="note">${m.attackRangeTiles} ช่อง</span></td></tr>`).join('')}</table></div></section>`;
+      h += `<section><h2>มอนสเตอร์ในแผนที่</h2><div class="tw"><table><tr><th>มอนสเตอร์</th><th class="num">Lv</th><th class="num">HP</th><th class="num">EXP</th><th>ธาตุ</th><th>เผ่า</th><th>ขนาด</th><th>ตี</th></tr>${mp.list.map(({m, count}) => `<tr><td>${m.star ? '★ ' : ''}${m.boss ? '👑 ' : ''}${rangeIcon(m)}<a class="mini" href="#monsters/${m.id}">${img(monArt(m.id))}${esc(m.name)}</a></td><td class="num">${m.level}</td><td class="num">${num(m.hp)}</td><td class="num">${num(m.exp)}</td><td>${elTag(m.element, m.elementLevel)}</td><td>${esc(RACE[m.race]||m.race)}</td><td>${esc(SIZE[m.size]||m.size)}</td><td>${m.magicAttack ? 'เวท' : 'กายภาพ'} <span class="note">${m.attackRangeTiles} ช่อง</span> ${rangeTag(m)}</td></tr>`).join('')}</table></div><p class="note">🏹 ตีไกล = ตีปกติได้ตั้งแต่ ${FAR} ช่อง · ↗ สกิลไกล = ตีปกติประชิด แต่มีสกิลถึงไกล (ชี้ที่ป้ายเพื่อดูชื่อสกิล)</p></section>`;
       h += pickSection(mp) + `<section><h2>ใช้ธาตุไหนฟาร์มดี</h2>
           <p class="note">ตัวคูณดาเมจต่อมอนที่เลือกไว้ · "เฉลี่ย" คิดถ่วงตาม HP สมมติว่ามอนทุกชนิดเกิดเท่ากัน · มี x0 = มีตัวที่ตีไม่เข้า</p>
           <div id="el-out"></div></section>`;
@@ -862,7 +872,7 @@ function tipHtml({cat, x}){
   if (cat === 'monsters') {
     const m = x;
     return `<div class="th">${img(monArt(m.id))}<div><b>${m.star ? '★ ' : ''}${m.boss ? '👑 ' : ''}${esc(m.name)}</b><span class="note">Lv.${m.level}</span></div></div>
-      <div class="tags" style="margin:0">${elTag(m.element, m.elementLevel)}<span class="tag">${esc(RACE[m.race]||m.race)}</span><span class="tag">${esc(SIZE[m.size]||m.size)}</span></div>
+      <div class="tags" style="margin:0">${elTag(m.element, m.elementLevel)}<span class="tag">${esc(RACE[m.race]||m.race)}</span><span class="tag">${esc(SIZE[m.size]||m.size)}</span>${rangeTag(m)}</div>
       <div class="kvs"><span>HP</span><b>${num(m.hp)}</b><span>EXP</span><b>${num(m.exp)}</b><span>ตี</span><b>${m.magicAttack ? 'เวท' : 'กายภาพ'} ${m.attackRangeTiles} ช่อง</b></div>`;
   }
   if (cat === 'skills') return `<div class="th">${img(skillIcon(x.id))}<div><b>${esc(x.name)}</b><span class="note">${esc(x.thai || '')}</span></div></div><div>${esc(x.description || '')}</div>`;
