@@ -734,7 +734,7 @@ const CATS = {
     get: id => DATA.stones.list.find(s => s.id === id),
     detail: s => {
       const vs = CATS.stones.vars.get(s.id) || [], vch = DATA.stones.variants?.chancePercent;
-      const vName = v => v.id.startsWith(s.id + '-') ? v.id.slice(s.id.length + 1).replace(/(^|-)(\w)/g, (_, d, c) => (d ? ' ' : '') + c.toUpperCase()) : v.id;
+      const vName = v => (v.id.startsWith(s.id + '-') ? v.id.slice(s.id.length + 1) : v.id.split('-').pop()).replace(/(^|-)(\w)/g, (_, d, c) => (d ? ' ' : '') + c.toUpperCase());
       let h = `<div class="dh"><div><h1>${esc(s.name || s.thai)}</h1><div class="sub">${esc(s.thai||'')} · ${esc(s.id)}${s.role ? ' · ' + esc(s.role) : ''}</div>
         ${vs.length ? `<div class="tags"><button type="button" class="tag star" style="cursor:pointer;font:inherit" data-jump="stone-vars">✦ มีแปรผัน: ${esc(vs.map(v => v.thai).join(', '))} ↓</button></div>` : ''}</div></div>`;
       if (s.effect) h += `<section><p>${esc(s.effect)}</p></section>`;

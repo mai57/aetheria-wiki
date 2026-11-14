@@ -163,7 +163,8 @@ const VARS = new Map((DATA.stones.variants?.list || []).map(v => [v.stone, v]));
 const varOf = st => VARS.get(st.id);
 const modelFn = (st, vary) => { const v = vary && varOf(st), vm = v && VARIANT[v.id]; return v ? (vm ? vm.m || MODEL[st.id] : null) : MODEL[st.id]; };
 const modelled = (st, vary) => !!modelFn(st, vary);
-const vShort = v => v.id.slice(v.stone.length + 1).replace(/(^|-)(\w)/g, (_, s, c) => (s ? ' ' : '') + c.toUpperCase());
+// suffix after the stone id ("trauma-quick" -> Quick); a few ids don't repeat the stone id ("meteor-heavy" for meteor-shower) -> last part
+const vShort = v => (v.id.startsWith(v.stone + '-') ? v.id.slice(v.stone.length + 1) : v.id.split('-').pop()).replace(/(^|-)(\w)/g, (_, s, c) => (s ? ' ' : '') + c.toUpperCase());
 const pickName = p => `${isWhole(p.st) ? '◆ ' : ''}${stoneName(p.st)}${p.vary && varOf(p.st) ? ` ✦ ${vShort(varOf(p.st))}` : ''}`;
 
 /* simulate casting the skill back-to-back for env.D seconds */
