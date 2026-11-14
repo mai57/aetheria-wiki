@@ -758,7 +758,8 @@ const CATS = {
             <label>ค่าหลักตอนนี้ <input type="number" step="any" id="stc-v" style="width:80px"></label>
             <label>เลเวลศิลา <select id="stc-l">${Array.from({length:STONE_MAXLV}, (_, i) => `<option${i + 1 === STONE_MAXLV ? ' selected' : ''}>${i + 1}</option>`).join('')}</select></label>
             <label>ตีบวก + <select id="stc-r">${Array.from({length:6}, (_, i) => `<option>${i}</option>`).join('')}</select></label>
-            <label>ระดับ <select id="stc-t">${s.tiers.map(t => `<option value="${t.tier}">${esc(RARITY[t.tier] || t.tier)}</option>`).join('')}</select></label></div>
+            <label>ระดับ <select id="stc-t">${s.tiers.map(t => `<option value="${t.tier}">${esc(RARITY[t.tier] || t.tier)}</option>`).join('')}</select></label>
+            ${varF(s) ? `<label title="ศิลาแปรผันได้ค่าหลัก ×${varF(s)} ของแบบปกติ (คูณทั้งค่าสุ่มและส่วนที่ตีบวก)"><input type="checkbox" id="stc-x"> ✦ แปรผัน (×${varF(s)})</label>` : ''}</div>
           <div class="cc-ctl">
             <label>เพิ่มต่อขั้นตีบวก <input type="number" step="any" id="stc-s" placeholder="ไม่รู้ก็เว้นไว้" style="width:110px"></label>
             <span class="note">= ค่าขั้นถัดไป − ค่าขั้นนี้ ในรายการตีบวก (ที่เลเวลศิลาตอนนี้) · เว้นว่าง = ใช้สูตร A/B ตามด้านล่าง</span></div>
@@ -1002,16 +1003,19 @@ $('#detail').addEventListener('click', e => {
 //  A: 12.5% of the COMMON tier's max roll, whatever the stone's tier (all commons, Trauma rare, Arcane Flow rare)
 //  B: k × the stone's own tier max (Cooldown Recovery rare 5% ladder, Brutality rare, Multistrike epic)
 const REFINE_B = {common:0.125, rare:0.05, epic:0.02, legendary:0.008};
+// variant stones: main value = normal value × f (whole value incl. refine — fits a rare Flurry ✦ at Lv.5 +5 = 333.4)
+const varF = st => { const v = VARS.get(st.id), f = v && VARIANT[v.id]?.f; return f && f !== 1 ? f : 0; };   // 0 = no toggle (unknown, or same value as normal)
 const REFINE_KNOWN = {trauma:'A', 'arcane-flow':'A', 'cooldown-recovery':'B', brutality:'B', multistrike:'B'};
 const refineStep = (st, tier, rule) => rule === 'A' ? 0.125 * (st.tiers.find(t => t.tier === 'common') || tier).main[1] : (REFINE_B[tier.tier] ?? 0.125) * tier.main[1];
 const RULE_TXT = {A:'ขั้นละ 12.5% ของค่าสูงสุดระดับธรรมดา', B:'ขั้นละ % ของค่าสูงสุดของระดับนี้ (ธรรมดา 12.5 · หายาก 5 · มหากาพย์ ~2 · ตำนาน ~0.8)'};
 $('#detail').addEventListener('click', e => { const j = e.target.closest('[data-jump]'); if (j) document.getElementById(j.dataset.jump)?.scrollIntoView({behavior:'smooth', block:'start'}); });
 $('#detail').addEventListener('input', e => {
-  if (!['stc-v', 'stc-l', 'stc-r', 'stc-t', 'stc-s'].includes(e.target.id)) return;
+  if (!['stc-v', 'stc-l', 'stc-r', 'stc-t', 'stc-s', 'stc-x'].includes(e.target.id)) return;
   const st = CATS.stones.get(state.stones.sel); if (!st) return;
   const v = +$('#stc-v').value, L = +$('#stc-l').value, R = +$('#stc-r').value, out = $('#stc-out');
   if (!(v > 0)) { out.innerHTML = ''; return; }
-  const lf = l => 1 + PER_LV * (l - 1) / 100, tier = st.tiers.find(t => t.tier === $('#stc-t').value) || st.tiers[0];
+  const vx = !!$('#stc-x')?.checked, vf = vx ? varF(st) : 1;
+  const lf = l => (1 + PER_LV * (l - 1) / 100) * vf, tier = st.tiers.find(t => t.tier === $('#stc-t').value) || st.tiers[0];
   const typed = +$('#stc-s').value > 0;
   const fits = step1 => { const roll = v / lf(L) - R * step1; return roll >= tier.main[0] - 0.6 && roll <= tier.main[1] + 0.6; };
   let rule = REFINE_KNOWN[st.id], why;
@@ -1027,9 +1031,12 @@ $('#detail').addEventListener('input', e => {
   const roll = v / lf(L) - R * step1;
   const val = (l, r) => (roll + r * step1) * lf(l);
   const inRange = fits(step1);
+  const vHint = (() => { if (vx || inRange || !varF(st)) return false;
+    const f2 = varF(st), lv2 = 1 + PER_LV * (L - 1) / 100, s2 = typed ? +$('#stc-s').value / (lv2 * f2) : step1, r2 = v / (lv2 * f2) - R * s2;
+    return r2 >= tier.main[0] - 0.6 && r2 <= tier.main[1] + 0.6; })();
   const sure = typed || tier.tier === 'common' || REFINE_KNOWN[st.id];
   const alt = !sure && Math.abs(step2 - step1) > 1e-9 ? (() => { const r2 = v / lf(L) - R * step2; return ` <span class="note">· ถ้าเป็นสูตร ${other}: ${R > 0 ? `ค่าสุ่ม ${r2.toFixed(1)}${fits(step2) ? ' (ก็อยู่ในช่วง)' : ' (ไม่อยู่ในช่วง)'}` : `Lv.${STONE_MAXLV} +5 = ${((r2 + 5 * step2) * lf(STONE_MAXLV)).toFixed(1)}`}</span>`; })() : '';
-  out.innerHTML = `<p class="note">ค่าสุ่มเริ่มต้น (Lv.1, +0) ≈ <b>${roll.toFixed(1)}</b> ${inRange ? `อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) ✓` : `<span style="color:var(--warn)">ไม่อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) — ${typed ? 'เช็กระดับหรือตัวเลขที่ใส่' : 'ใส่ "เพิ่มต่อขั้น" จากรายการตีบวกในเกม'}</span>`} · ${typed ? 'ใช้ค่าเพิ่มต่อขั้นที่ใส่' : `สูตร ${rule}: ${RULE_TXT[rule]} = ${(step1 * lf(L)).toFixed(2)} ต่อขั้นที่ Lv.${L} ${sure ? `(${why})` : `<span style="color:var(--warn)">(${why} — ถ้ามีรายการตีบวกในเกม ใส่ "เพิ่มต่อขั้น" จะแม่นกว่า)</span>`}`}${alt}</p>
+  out.innerHTML = `<p class="note">ค่าสุ่มเริ่มต้น (Lv.1, +0) ≈ <b>${roll.toFixed(1)}</b> ${inRange ? `อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) ✓` : `<span style="color:var(--warn)">ไม่อยู่ในช่วงระดับ${esc(RARITY[tier.tier])} (${tier.main.join('–')}) — ${typed ? 'เช็กระดับหรือตัวเลขที่ใส่' : 'ใส่ "เพิ่มต่อขั้น" จากรายการตีบวกในเกม'}</span>`} · ${typed ? 'ใช้ค่าเพิ่มต่อขั้นที่ใส่' : `สูตร ${rule}: ${RULE_TXT[rule]} = ${(step1 * lf(L)).toFixed(2)} ต่อขั้นที่ Lv.${L} ${sure ? `(${why})` : `<span style="color:var(--warn)">(${why} — ถ้ามีรายการตีบวกในเกม ใส่ "เพิ่มต่อขั้น" จะแม่นกว่า)</span>`}`}${alt}${vx ? ` · ✦ แปรผัน: ค่าทั้งหมด ×${vf}` : ''}${vHint ? ` <span style="color:var(--warn)">· ศิลานี้น่าจะเป็น ✦ แปรผัน — ติ๊กช่อง "✦ แปรผัน" แล้วค่าสุ่มจะอยู่ในช่วง</span>` : ''}</p>
     <div class="tw"><table><tr><th>เลเวล \ ตีบวก</th>${[0,1,2,3,4,5].map(r => `<th class="num">+${r}</th>`).join('')}</tr>
     ${Array.from({length:STONE_MAXLV}, (_, i) => i + 1).map(l => `<tr><td>Lv.${l}</td>${[0,1,2,3,4,5].map(r => `<td class="num"${l === L && r === R ? ' style="background:var(--accent-soft);font-weight:700"' : ''}>${val(l, r).toFixed(1)}</td>`).join('')}</tr>`).join('')}</table></div>`;
 });
