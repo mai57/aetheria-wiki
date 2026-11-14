@@ -202,7 +202,8 @@ function simulate(info, lv, picks, env){
   // confirmed in game: a stone's "ดาเมจสกิลนี้ +%" line adds to the same pool as other skill-damage bonuses
   const cf = 1 + c * (cmul - 1), base = pct * E * (1 + (env.bonus + sdmg) / 100), base0 = pct * E * (1 + env.bonus / 100);
   const n = b.n + agg.hitsAdd, N = env.N, skillT = info.area ? N : 1;
-  const statMul = info.statCast ? Math.max(0, 1 - (2 * env.dex + env.int) / 350) : 1;
+  // "ร่ายเร็วขึ้น %" from the character screen (DEX/INT and gear together) shortens only the variable part
+  const statMul = info.statCast ? Math.max(0, 1 - env.castPct / 100) : 1;
   const cdT = b.cd * Math.max(0.05, 1 + agg.cdAdd), castT = (info.castV * statMul + info.castF) * agg.castMul + agg.castAdd, minI = env.minI * agg.delayMul;
   const cycle = Math.max(cdT, castT + minI, 0.2);
   const B0 = base0 * b.n * cf;                      // one target, before stones
@@ -260,13 +261,13 @@ const reqText = st => { const r = st.requires || {}, f = a => a.map(t => TAG_TH[
   return [r.all?.length ? f(r.all) : '', r.any?.length ? 'อย่างใดอย่างหนึ่ง: ' + r.any.map(t => TAG_TH[t] || t).join(' / ') : '', r.not?.length ? 'ไม่ใช่: ' + r.not.map(t => TAG_TH[t] || t).join(' / ') : ''].filter(Boolean).join(' · '); };
 
 /* ---------- state ---------- */
-calc.sim = Object.assign({N:1, D:30, crit:0, critDmg:150, elMult:1, myHp:100, minI:0.2, dex:0, int:0, bonus:0, party:false, frozen:false, near:true, roll:'avg', searchTier:'legendary', searchLv:1, searchVary:false, per:{}}, calc.sim || {});
+calc.sim = Object.assign({N:1, D:30, crit:0, critDmg:150, elMult:1, myHp:100, minI:0.2, castPct:0, bonus:0, party:false, frozen:false, near:true, roll:'avg', searchTier:'legendary', searchLv:1, searchVary:false, per:{}}, calc.sim || {});
 // v2: default delay 0.5 → 0.2 s (in-game counts showed ~0.2 s or less); move players still on the old default
 if ((calc.sim.v || 1) < 2) { if (+calc.sim.minI === 0.5) calc.sim.minI = 0.2; calc.sim.v = 2; }
 const simState = id => calc.sim.per[id] ||= {lv:null, stones:[], tags:null, real:0};
 const simTags = info => new Set(simState(info.s.id).tags || [...info.guess]);
 const sockets = lv => UNLOCK.filter(u => lv >= u).length;
-const envOf = () => { const s = calc.sim; return {N:Math.max(1, +s.N || 1), D:Math.max(1, +s.D || 30), crit:+s.crit || 0, critDmg:+s.critDmg || 150, elMult:+s.elMult || 0, myHp:+s.myHp || 100, minI:Number.isFinite(+s.minI) && s.minI !== '' ? Math.max(0, +s.minI) : 0.2, dex:Math.max(0, +s.dex || 0), int:Math.max(0, +s.int || 0), bonus:+s.bonus || 0, party:!!s.party, frozen:!!s.frozen, near:!!s.near, roll:s.roll}; };
+const envOf = () => { const s = calc.sim; return {N:Math.max(1, +s.N || 1), D:Math.max(1, +s.D || 30), crit:+s.crit || 0, critDmg:+s.critDmg || 150, elMult:+s.elMult || 0, myHp:+s.myHp || 100, minI:Number.isFinite(+s.minI) && s.minI !== '' ? Math.max(0, +s.minI) : 0.2, castPct:Math.min(100, Math.max(0, +s.castPct || 0)), bonus:+s.bonus || 0, party:!!s.party, frozen:!!s.frozen, near:!!s.near, roll:s.roll}; };
 const picksOf = (info, st) => (st.stones || []).slice(0, sockets(st.lv)).filter(x => x && stoneById.has(x.id)).map(x => ({st:stoneById.get(x.id), tier:x.tier || 'legendary', lv:x.lv || 1, val:+x.val || 0, sdmg:+x.sdmg || 0, cspd:+x.cspd || 0, cdr:+x.cdr || 0, vary:!!(x.vary && VARS.has(x.id))}));
 
 function bestCombos(info, lv, tags, env){
@@ -315,8 +316,8 @@ function simDetail(info){
     <div class="cc-els">${SIM_TAGS.map(t => `<label class="${tags.has(t) ? 'on' : ''}"><input type="checkbox" data-sim-tag="${t}"${tags.has(t) ? ' checked' : ''}><span class="tag">${TAG_TH[t]}</span></label>`).join('')}</div></section>`;
   h += `<section><h2>ตั้งค่า</h2>
     <div class="cc-ctl"><label>เลเวลสกิล <select data-sim-lv>${Array.from({length:info.levels}, (_, i) => `<option${i + 1 === st.lv ? ' selected' : ''}>${i + 1}</option>`).join('')}</select></label>
-      ${num('N', 'มอนในระยะ', 56, 1, ' ตัว')}${num('D', 'ตีต่อเนื่อง', 60, 1, ' วิ')}${num('minI', 'ดีเลย์ขั้นต่ำต่อการกด', 60, 0.1, ' วิ')}${info.statCast ? `${num('dex', 'DEX', 56, 1)}${num('int', 'INT', 56, 1)}` : ''}</div>
-    ${info.statCast ? `<p class="note" style="margin-top:-4px">เวลาร่ายส่วนแรก × (1 − (2×DEX + INT) ÷ 350) ส่วนร่ายตายตัวไม่ลด → ร่ายจริง ${((info.castV * Math.max(0, 1 - (2 * (+S.dex || 0) + (+S.int || 0)) / 350)) + info.castF).toFixed(2)} วิ (ไม่รวมศิลา) · ดีเลย์ 0.2 วิมาจากการนับในเกม (Blizzard / Thunder ใส่ครบ 3 สกิลใน auto)</p>` : ''}
+      ${num('N', 'มอนในระยะ', 56, 1, ' ตัว')}${num('D', 'ตีต่อเนื่อง', 60, 1, ' วิ')}${num('minI', 'ดีเลย์ขั้นต่ำต่อการกด', 60, 0.1, ' วิ')}${info.statCast ? num('castPct', 'ร่ายเร็วขึ้น', 56, 1, ' %') : ''}</div>
+    ${info.statCast ? `<p class="note" style="margin-top:-4px">"ร่ายเร็วขึ้น" = ตัวเลขในหน้าตัวละคร (รวม DEX/INT และอุปกรณ์แล้ว) ลดเฉพาะเวลาร่ายส่วนแรก ร่ายตายตัวไม่ลด → ร่ายจริง ${((info.castV * Math.max(0, 1 - Math.min(100, +S.castPct || 0) / 100)) + info.castF).toFixed(2)} วิ (ไม่รวมศิลา) · ดีเลย์ 0.2 วิมาจากการนับในเกม (Blizzard / Thunder ใส่ครบ 3 สกิลใน auto)</p>` : ''}
     <div class="cc-ctl">${num('crit', 'CRIT', 60, 1, ' %')}${num('critDmg', 'ดาเมจคริ', 64, 1, ' %')}${num('elMult', 'ตัวคูณธาตุ', 56, 0.05)}${num('bonus', 'ดาเมจสกิลนี้เพิ่ม (อาวุธ/พาสซีฟ/เจม)', 64, 1, ' %')}</div>
     <div class="cc-ctl">${num('myHp', 'HP ตัวเอง', 56, 1, ' %')}${chk('party', 'ตีพร้อมปาร์ตี้')}${chk('frozen', 'เป้าแข็งอยู่')}${chk('near', 'เป้าอยู่ใกล้ 3 ช่อง')}
       <label>ค่าศิลา <select data-sim="roll">${[['min','ต่ำสุด'],['avg','กลาง'],['max','สูงสุด']].map(([v, l]) => `<option value="${v}"${S.roll === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div>
