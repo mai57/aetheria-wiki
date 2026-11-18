@@ -73,6 +73,9 @@ main{flex:1;display:grid;grid-template-columns:minmax(300px,380px) 1fr;min-heigh
 .el{display:inline-block;padding:0 7px;border-radius:999px;font-size:12px;color:#fff;white-space:nowrap}
 section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
 section h2{margin:0 0 10px;font-size:15px;color:var(--accent)}
+section h3{margin:14px 0 6px;font-size:14px}
+section details{margin-top:12px}
+section summary{cursor:pointer;color:var(--accent);font-weight:600}
 section p{margin:4px 0}
 .note{color:var(--muted);font-size:13px}
 .kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 16px}
@@ -577,6 +580,7 @@ function itemDetail(i){
     h += `</ul></section>`;
   }
   if (i.album?.length) h += `<section><h2>โบนัสสมุดการ์ด (ลงทะเบียน)</h2><ul class="plain">${i.album.map(a => { const [l, v] = attrShort(a.stat || a.type, a.value); return `<li>${esc(l)} <b>${v}</b></li>`; }).join('')}</ul></section>`;
+  if (i.type === 'Card') h += cardStarSection(i);
   if (i.set) h += `<section><h2>เซ็ต</h2>${generic(i.set)}</section>`;
   h += `<section><h2>ข้อมูล</h2><div class="kv">${facts.map(([k,v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></section>`;
   if (i.droppedBy?.length) {
@@ -591,6 +595,47 @@ function itemDetail(i){
   if (i.craft) h += `<section><h2>คราฟต์</h2>${generic(i.craft)}</section>`;
   if (i.ascend) h += `<section><h2>อัปเกรด (Ascend)</h2>${generic(i.ascend)}</section>`;
   return h;
+}
+/* ---------- card stars (อัปดาวการ์ด) ----------
+   Not in the game's wiki-data yet: rules from the in-game help text and the upgrade screen (18 Nov 2026). */
+const CARD_STAR = {
+  max: 10,
+  mainStep: {5: 0.30, 10: 0.25},   // main stats gain this share of the base value at 5★ / 10★
+  // dust, Night Card Dust and extra copy per star; zeny known only at star 1 and star 10
+  cost: [
+    [1, 10, 0, 0, '10M'], [2, 10, 0, 0, ''], [3, 10, 0, 0, ''], [4, 10, 0, 0, ''], [5, 20, 0, 1, ''],
+    [6, 30, 5, 0, ''], [7, 30, '', 0, ''], [8, 30, '', 0, ''], [9, 30, '', 0, ''], [10, 60, 15, 1, '150M'],
+  ],
+  // what every star (except 5 / 10) adds, by card slot; rarer cards grow more
+  perStar: {Weapon: 'ดาเมจ %', Armor: 'Max HP %', Shield: 'DEF +0.3 · MDEF +0.3 (การ์ดหายาก เช่น Sigil Lion)'},
+};
+const fmtN = x => String(+x.toFixed(2));
+function cardStarSection(i){
+  const C = CARD_STAR, nums = (i.attributes || []).filter(a => typeof a.value === 'number' && a.value);
+  const at = (a, s) => a.value * (1 + (s >= 5 ? C.mainStep[5] : 0) + (s >= 10 ? C.mainStep[10] : 0));
+  const main = nums.length ? `<div class="tw"><table><tr><th>ค่าหลัก</th><th class="num">0 ดาว</th><th class="num">5 ดาว</th><th class="num">10 ดาว</th></tr>${nums.map(a => {
+      const [l] = attrShort(a.type, a.value), unit = / %$/.test(attrLabel(a.type)) ? '%' : '', sg = v => `${v > 0 ? '+' : ''}${fmtN(v)}${unit}`;
+      return `<tr><td>${esc(l)}</td><td class="num">${sg(a.value)}</td><td class="num">${sg(at(a, 5))}</td><td class="num"><b>${sg(at(a, 10))}</b></td></tr>`;
+    }).join('')}</table></div>`
+    : `<p class="note">การ์ดใบนี้ไม่มีค่าหลักที่เป็นตัวเลข — ผลพิเศษไม่เปลี่ยนตามดาว ได้แค่ค่าที่โตทุกดาว</p>`;
+  const slots = (i.cardSlotTypes || []).map(s => ['Helmet','HeadMid','HeadLow'].includes(s) ? 'Helmet' : s);
+  const grow = [...new Set(slots)].map(s => `<li>${esc(SLOT[s] || s)}: ${C.perStar[s] ? esc(C.perStar[s]) : '<span class="note">ยังไม่มีข้อมูล — ดูในหน้าอัปดาวในเกม</span>'}</li>`).join('');
+  return `<section><h2>อัปดาวการ์ด (สูงสุด ${C.max} ดาว)</h2>
+    <p class="note">อัปที่นักเล่นแร่การ์ด (แท็บ อัปดาวการ์ด) · อัปได้ทั้งการ์ดในกระเป๋าและที่ใส่อยู่ · สำเร็จทุกครั้ง ไม่มีลดดาว</p>
+    ${main}
+    <p class="note">ถึง 5 ดาว ค่าหลัก +30% ของค่าเดิม · ถึง 10 ดาว อีก +25% (รวม ×1.55) · ผลพิเศษ (เช่น มีโอกาสร่ายสกิล) ไม่เปลี่ยน</p>
+    <h3>ค่าที่โตทุกดาว (ยกเว้นดาว 5 / 10)</h3><ul class="plain">${grow}</ul>
+    <details><summary>ค่าอัปแต่ละดาว และกติกาอื่น</summary>
+      <div class="tw"><table><tr><th>ดาว</th><th class="num">ผงการ์ด</th><th class="num">Night Card Dust</th><th class="num">การ์ดใบเดิม</th><th class="num">Zeny</th></tr>
+      ${C.cost.map(([s, d, n, c, z]) => `<tr><td>${s}</td><td class="num">${d}</td><td class="num">${n === '' ? '<span class="note">5–15</span>' : n || '-'}</td><td class="num">${c ? `+${c} ใบ (0 ดาว)` : '-'}</td><td class="num">${z || '<span class="note">?</span>'}</td></tr>`).join('')}
+      <tr><td><b>รวม</b></td><td class="num"><b>${C.cost.reduce((t, r) => t + r[1], 0)}</b></td><td></td><td class="num"><b>+2 ใบ</b></td><td class="num"><span class="note">10M → 150M ต่อดาว</span></td></tr></table></div>
+      <ul class="plain">
+        <li>ต้านธาตุ / เผ่า / ขนาด รวมกันได้สูงสุด 80%</li>
+        <li>การ์ดที่อัปแล้วขายในตลาดและเทรดได้ ดาวติดไปกับการ์ด</li>
+        <li>ย่อยการ์ดที่มีดาว ได้ผงคืนครึ่งหนึ่งของที่ใช้อัป (ไม่คืน Zeny)</li>
+      </ul>
+      <p class="note">ข้อมูลจากข้อความในเกมและหน้าอัปดาว (18 พ.ย. 2569) — วิกิทางการยังไม่มีตารางนี้ · Zeny ดาว 2–9 และค่าที่โตทุกดาวของช่องอื่นยังไม่รู้</p>
+    </details></section>`;
 }
 function generic(v){
   if (v == null) return '';
