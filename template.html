@@ -596,6 +596,37 @@ function itemDetail(i){
   if (i.ascend) h += `<section><h2>อัปเกรด (Ascend)</h2>${generic(i.ascend)}</section>`;
   return h;
 }
+/* ---------- skill awakening (ปลุกพลังสกิล) ----------
+   Not in the game's wiki-data (the game sends it only to logged-in players): from the in-game patch notes (20 Nov 2026). */
+const LANCE_AWAKEN = {
+  paths: [['farm', 'ล่ามอน'], ['duel', 'ดวล'], ['boss', 'ล่าบอส']],
+  tiers: [
+    {lv: 5, opts: [
+      ['หอกเร่ง', 'Quick Lance', 'เวลาร่าย −30% · คูลดาวน์ −20%'],
+      ['หอกไกล', 'Far Lance', 'ระยะร่าย +1 ช่อง · ดาเมจ +10%'],
+      ['หอกคม', 'Sharp Lance', 'ดาเมจ +25%']]},
+    {lv: 12, opts: [
+      ['หอกแตก', 'Burst Lance', 'หอกกระโดดต่อจากเป้าไปมอนที่ใกล้ที่สุดในระยะ 3 ช่อง ต่อกันเป็นโซ่สูงสุด 3 ตัว ไม่ซ้ำตัว แรง 70% ของดาเมจทั้งสกิล (นับศิลาที่ใส่ด้วย) · ใส่ศิลา Chain ด้วย ศิลาจะเด้งอีกชุดแยกจากโซ่นี้ แรงตามศิลา'],
+      ['หอกตัดร่าย', 'Cutting Lance', 'ผู้เล่นที่กำลังร่ายโดนดาเมจ +40% · PvE: มอนที่กำลังใช้สกิล +40%'],
+      ['หอกล่ายักษ์', 'Giant-Slayer Lance', 'หอกใส่บอส / Elite ดาเมจ +30%']]},
+    {lv: 15, opts: [
+      ['หอกทะลวงแนว', 'Line Lance', 'หอกพุ่งทะลุเป้าต่ออีก 5 ช่อง ศัตรูทุกตัวในแนวโดน 100% ของดาเมจทั้งสกิล (นับศิลาที่ใส่ด้วย)'],
+      ['หอกทะลุผ้าคลุม', 'Cloak-Piercing Lance', 'ค่าต้านทานธาตุของเป้า (ผ้าคลุม / การ์ด) มีผลกับหอกครึ่งเดียว · PvE: มอนที่ต้านธาตุหอก รับดาเมจเต็ม (ไม่โดนลดดาเมจธาตุ)'],
+      ['หอกผ่าซ้ำ', 'Cleaving Lance', 'หอกผ่าเป้าหลักซ้ำอีก 1 ครั้ง 80% ของดาเมจทั้งสกิล (นับศิลาที่ใส่ด้วย)']]},
+  ],
+  notes: ['ปลดล็อกเมื่อสกิลถึง Lv.5 / 12 / 15 เลือกได้ชั้นละ 1 แบบ ผสมสายได้ · เปลี่ยนตัวเลือกได้ในหน้าสกิล',
+    'เลเวล 11–15 ได้จากไอเทมเท่านั้น · อัปเกรด Level Gem (+1 → +2) ของ Flame / Frost / Thunder Lance ได้ที่ช่างเจียระไน'],
+};
+const AWAKEN = {'fire-bolt': LANCE_AWAKEN, 'cold-bolt': LANCE_AWAKEN, 'lightning-bolt': LANCE_AWAKEN};
+function awakenSection(a){
+  return `<section><h2>ปลุกพลังสกิล (Awakening)</h2>
+    <div class="tw"><table><tr><th>ปลด</th>${a.paths.map(([, l]) => `<th>${esc(l)}</th>`).join('')}</tr>
+    ${a.tiers.map(t => `<tr><td><b>Lv.${t.lv}</b></td>${t.opts.map(([th, en, fx]) => `<td><b>${esc(th)}</b> <span class="note">${esc(en)}</span><br>${esc(fx)}</td>`).join('')}</tr>`).join('')}
+    </table></div>
+    <ul class="plain">${a.notes.map(n => `<li class="note">${esc(n)}</li>`).join('')}</ul>
+    <p class="note">ข้อมูลจากประกาศในเกม (20 พ.ย. 2569) — วิกิทางการยังไม่มีส่วนนี้</p></section>`;
+}
+
 /* ---------- card stars (อัปดาวการ์ด) ----------
    Not in the game's wiki-data yet: rules from the in-game help text and the upgrade screen (18 Nov 2026). */
 const CARD_STAR = {
@@ -768,6 +799,7 @@ const CATS = {
       }
       if (simById.has(s.id)) h = h.replace('</h1>', ` <a class="tag" data-nav href="#sim/${s.id}">จำลองดาเมจ + ศิลา →</a></h1>`);
       if (s.notes?.length) h += `<section><h2>หมายเหตุ</h2><ul class="plain">${s.notes.map(f => `<li>${esc(f)}</li>`).join('')}</ul></section>`;
+      if (AWAKEN[s.id]) h += awakenSection(AWAKEN[s.id]);
       return h;
     },
   },
